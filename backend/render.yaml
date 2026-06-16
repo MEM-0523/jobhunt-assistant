@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: career-shift-api
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: DATABASE_URL
+        value: sqlite:///./job_assistant.db
+      - key: CORS_ALLOW_ORIGINS
+        value: https://dada-jobhunt.pages.dev,https://*.pages.dev,http://localhost:5173,http://localhost:5174,http://localhost:5175
+      - key: PINME_API_KEY
+        sync: false
+      - key: SECRET_KEY
+        generateValue: true
+      - key: JWT_ALGORITHM
+        value: HS256

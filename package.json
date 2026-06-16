@@ -1,0 +1,11 @@
+{
+  "name": "career-shift",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "build:frontend": "cd frontend && npm install && npm run build",
+    "build:worker": "cd backend && echo 'Python backend - not a Cloudflare Worker'",
+    "dev": "cd frontend && npm run dev",
+    "dev:frontend": "cd frontend && npm run dev"
+  }
+}

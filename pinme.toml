@@ -1,0 +1,12 @@
+# Pinme config file
+# Project name (required)
+project_name = "career-shift"
+
+# Frontend configuration
+frontend_dir = "frontend"
+frontend_build_cmd = "npm run build"
+frontend_output_dir = "dist"
+
+# Backend is Python FastAPI, deployed separately (not via Pinme Workers)
+# API URL for frontend to connect to
+api_url = "https://career-shift.api.pinme.pro"

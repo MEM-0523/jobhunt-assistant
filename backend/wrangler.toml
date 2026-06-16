@@ -1,0 +1,16 @@
+name = "jobhunt-api"
+compatibility_date = "2024-01-01"
+
+[vars]
+DATABASE_URL = "sqlite:///./job_assistant.db"
+JWT_SECRET_KEY = "jobhunt-prod-secret-2026"
+PINME_API_KEY = "74365a3135df4a9a44f580d1ad56ee35cc580eb86fd7c18adeebf446132a2e29"
+PINME_BASE_URL = "https://pinme.cloud"
+PINME_PROJECT_NAME = "lingjing-e0c1"
+FEISHU_APP_TOKEN = ""
+FEISHU_TABLE_ID = ""
+
+[[rules]]
+type = "Data"
+glob = ["*.db"]
+allow = ["read", "write"]
