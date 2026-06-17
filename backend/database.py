@@ -6,6 +6,8 @@ from sqlalchemy.orm import sessionmaker, DeclarativeBase
 # Local dev:  DATABASE_URL not set → defaults to SQLite
 # Production: DATABASE_URL=postgresql://... (Supabase connection string)
 SQLALCHEMY_DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./job_assistant.db")
+# Strip quotes that may be added by Railway raw editor
+SQLALCHEMY_DATABASE_URL = SQLALCHEMY_DATABASE_URL.strip('"').strip("'")
 
 if "sqlite" in SQLALCHEMY_DATABASE_URL:
     engine = create_engine(

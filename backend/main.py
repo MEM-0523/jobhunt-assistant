@@ -23,7 +23,10 @@ DEFAULT_CORS_ORIGINS = [
 
 cors_env = os.getenv("CORS_ALLOW_ORIGINS", "")
 if cors_env:
-    ALLOW_ORIGINS = [origin.strip() for origin in cors_env.split(",") if origin.strip()]
+    if cors_env == "*":
+        ALLOW_ORIGINS = ["*"]
+    else:
+        ALLOW_ORIGINS = [origin.strip() for origin in cors_env.split(",") if origin.strip()]
 else:
     ALLOW_ORIGINS = DEFAULT_CORS_ORIGINS
 
@@ -43,7 +46,7 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOW_ORIGINS,
-    allow_credentials=True,
+    allow_credentials=ALLOW_ORIGINS != ["*"],
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -60,4 +63,9 @@ app.include_router(feedback.router, prefix="/api")
 
 @app.get("/api/health")
 def health_check():
+    return {"status": "ok", "version": "1.0.0"}
+
+
+@app.get("/health")
+def root_health_check():
     return {"status": "ok", "version": "1.0.0"}
