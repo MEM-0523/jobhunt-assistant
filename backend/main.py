@@ -1,10 +1,13 @@
 import os
+from pathlib import Path
 from dotenv import load_dotenv
 load_dotenv()  # Load .env before importing routers that use PINME_API_KEY
 
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from database import engine, Base
 from routers import auth, profile, jobs, jobs_search, jobs_analysis, resumes, applications, interviews, feedback, career, seed, notifications, experiences, strengths, platform_auth
 
@@ -79,3 +82,22 @@ def health_check():
 @app.get("/health")
 def root_health_check():
     return {"status": "ok", "version": "1.0.0"}
+
+
+# ============ 生产环境：服务前端静态文件 ============
+FRONTEND_DIST = Path(__file__).parent / "frontend-dist"
+IS_PRODUCTION = os.getenv("PRODUCTION", "").lower() == "true"
+
+if IS_PRODUCTION and FRONTEND_DIST.exists():
+    # 挂载静态资源（JS/CSS/图片等）
+    assets_dir = FRONTEND_DIST / "assets"
+    if assets_dir.exists():
+        app.mount("/assets", StaticFiles(directory=str(assets_dir)), name="assets")
+
+    # SPA 回退：所有非 API 路由返回 index.html
+    @app.get("/{full_path:path}")
+    async def serve_spa(full_path: str):
+        file_path = FRONTEND_DIST / full_path
+        if file_path.is_file():
+            return FileResponse(file_path)
+        return FileResponse(FRONTEND_DIST / "index.html")
