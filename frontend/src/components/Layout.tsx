@@ -15,6 +15,10 @@ import {
   Zap,
   ClipboardList,
   FileSearch,
+  Award,
+  Sparkles,
+  Mic,
+  Link2,
 } from 'lucide-react';
 import Navbar from './Navbar';
 import client from '../api/client';
@@ -22,6 +26,7 @@ import client from '../api/client';
 const sidebarItems = [
   { to: '/dashboard', icon: LayoutDashboard, label: '首页' },
   { to: '/search', icon: Search, label: '搜索岗位' },
+  { to: '/platform-auth', icon: Link2, label: '平台连接' },
   { to: '/favorites', icon: Heart, label: '收藏岗位' },
   { to: '/direct-analyze', icon: FileSearch, label: 'JD直推' },
   { to: '/career-transition', icon: Zap, label: '能力迁移' },
@@ -29,6 +34,9 @@ const sidebarItems = [
   { to: '/resume', icon: FileText, label: '我的简历' },
   { to: '/applications', icon: ListChecks, label: '投递追踪' },
   { to: '/interview-prep', icon: Target, label: '面试准备' },
+  { to: '/experience-assets', icon: Award, label: '经历资产' },
+  { to: '/strength-analysis', icon: Sparkles, label: '优势分析' },
+  { to: '/interview-practice', icon: Mic, label: '面试训练' },
   { to: '/settings', icon: Settings, label: '设置' },
 ];
 

@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   ChevronLeft, ChevronRight, CheckCircle2, BarChart3,
-  Brain, Lightbulb, Target,
+  Brain, Lightbulb, Target, Zap,
 } from 'lucide-react';
 import { QUESTIONS, scoreAssessment } from '../utils/assessment';
 
@@ -182,6 +182,13 @@ export default function CareerAssessment() {
             用推荐方向搜索岗位
           </button>
         </div>
+        <button
+          onClick={() => navigate('/career-transition')}
+          className="flex items-center justify-center gap-2 w-full py-2.5 bg-purple-50 text-purple-700 rounded-lg text-sm font-medium hover:bg-purple-100 border border-purple-200"
+        >
+          <Zap size={16} />
+          查看转型路径建议
+        </button>
       </div>
     );
   }

@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Zap, Loader2, Star, AlertCircle, Heart, Send, FileText, CheckCircle, ChevronDown, ChevronUp, Lightbulb } from 'lucide-react';
+import { Zap, Loader2, AlertCircle, Heart, Send, FileText, CheckCircle, ChevronDown, ChevronUp, Lightbulb } from 'lucide-react';
 import client from '../api/client';
 import { transitionCases } from '../data/transitionCases';
+import FiveDimensionScore from '../components/FiveDimensionScore';
 
 interface BlockAnalysis {
   prototype?: string;
@@ -17,15 +18,17 @@ interface BlockAnalysis {
   rating?: string;
   summary?: string;
   suggestions?: string[];
+  // 5维度评分（新）
+  experience_fit?: number;
+  hard_requirements?: number;
+  interest_direction?: number;
+  practical_constraints?: number;
+  risk_screening?: number;
+  total_score?: number;
+  grade?: string;
+  red_flags?: string[];
+  reasoning?: string;
 }
-
-const RATING_COLORS: Record<string, string> = {
-  A: 'text-green-600 bg-green-50',
-  B: 'text-blue-600 bg-blue-50',
-  C: 'text-yellow-600 bg-yellow-50',
-  D: 'text-orange-600 bg-orange-50',
-  F: 'text-red-600 bg-red-50',
-};
 
 const BLOCK_LABELS: Record<string, string> = {
   block_a: 'A · 角色概述',
@@ -320,19 +323,13 @@ export default function JDDirectAnalyze() {
                   <p className="text-sm text-gray-500 mt-0.5">检测原型：{analysis.prototype}</p>
                 )}
               </div>
-              <div className="flex items-center gap-3">
-                {analysis.rating && (
-                  <span className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-sm font-bold ${RATING_COLORS[analysis.rating] || 'text-gray-600 bg-gray-50'}`}>
-                    <Star size={14} />
-                    {analysis.rating}
-                  </span>
-                )}
-                <span className="text-3xl font-bold text-indigo-600">{analysis.overall_score}</span>
-                <span className="text-sm text-gray-400">/100</span>
-              </div>
             </div>
+
+            {/* 5维度评分卡 */}
+            <FiveDimensionScore data={analysis} />
+
             {analysis.summary && (
-              <p className="text-gray-700 text-sm leading-relaxed bg-indigo-50 rounded-lg px-4 py-3">
+              <p className="text-gray-700 text-sm leading-relaxed bg-indigo-50 rounded-lg px-4 py-3 mt-4">
                 {analysis.summary}
               </p>
             )}

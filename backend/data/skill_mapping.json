@@ -1,75 +1,248 @@
 {
-  "transitions": [
-    {
-      "id": "architecture-to-ai",
-      "from_industry": "建筑设计",
-      "from_role": "建筑设计师",
-      "to_industry": "AI/互联网",
-      "to_role": "AI产品经理",
-      "transferable_skills": [
-        {"skill": "需求分析与拆解", "level": "精通", "reason": "9年建筑设计本质是将客户需求拆解为可执行方案"},
-        {"skill": "项目全流程管理", "level": "精通", "reason": "从方案到施工图到验收的完整项目管理经验"},
-        {"skill": "跨专业协调", "level": "精通", "reason": "日常协调结构/暖通/电气/给排水等多专业"},
-        {"skill": "标准化与规模化", "level": "熟练", "reason": "将30款产品设计逻辑提炼为通用规则和15项专利"},
-        {"skill": "用户洞察", "level": "熟练", "reason": "通过方案汇报理解业主真实需求，非简单执行"},
-        {"skill": "文档与汇报", "level": "精通", "reason": "国家一级注册建筑师，方案汇报专业经验"}
+  "occupations": {
+    "建筑设计师": {
+      "core_skills": [
+        {"skill": "需求分析与拆解", "level": "精通", "description": "将客户需求拆解为可执行方案，9年经验"},
+        {"skill": "方案设计", "level": "精通", "description": "从概念到施工图的全流程设计能力"},
+        {"skill": "项目管理", "level": "精通", "description": "多专业协调、进度控制、风险管控"},
+        {"skill": "跨专业协调", "level": "精通", "description": "日常协调结构/暖通/电气/给排水等10+专业"},
+        {"skill": "标准化与规模化", "level": "熟练", "description": "将设计逻辑提炼为通用规则和专利"},
+        {"skill": "文档与汇报", "level": "精通", "description": "方案汇报、投标文件、技术文档编写"},
+        {"skill": "用户洞察", "level": "熟练", "description": "通过方案汇报理解业主真实需求"}
       ],
-      "skill_gaps": [
-        {"gap": "数据驱动决策", "severity": "high", "suggestion": "通过免费数据课程（谷歌数据分析证书）弥补"},
-        {"gap": "敏捷/Scrum流程", "severity": "medium", "suggestion": "参加1个敏捷项目即可，建筑师天然的迭代经验可以迁移"},
-        {"gap": "原型工具（Figma等）", "severity": "low", "suggestion": "2周可掌握基础"}
-      ],
-      "recommended_archetypes": [
-        {"archetype": "AI产品经理", "fit_score": 85, "reason": "需求分析和用户洞察强匹配"},
-        {"archetype": "AI解决方案架构师", "fit_score": 75, "reason": "系统设计和跨专业集成经验匹配"},
-        {"archetype": "AI转型顾问", "fit_score": 70, "reason": "标准化推广和团队赋能经验匹配"}
+      "typical_transitions": [
+        {
+          "to": "AI产品经理",
+          "to_industry": "AI/互联网",
+          "overlap_score": 0.75,
+          "overlap_skills": ["需求分析", "项目管理", "跨专业协调", "标准化", "文档汇报"],
+          "gaps": [
+            {"gap": "数据驱动决策", "severity": "high", "suggestion": "通过免费数据课程（谷歌数据分析证书）弥补", "estimated_hours": 40},
+            {"gap": "敏捷/Scrum流程", "severity": "medium", "suggestion": "参加1个敏捷项目，建筑师天然的迭代经验可迁移", "estimated_hours": 20},
+            {"gap": "原型工具（Figma等）", "severity": "low", "suggestion": "2周可掌握基础", "estimated_hours": 10}
+          ],
+          "recommended_archetypes": [
+            {"archetype": "AI产品经理", "fit_score": 85, "reason": "需求分析和用户洞察强匹配"},
+            {"archetype": "AI解决方案架构师", "fit_score": 75, "reason": "系统设计和跨专业集成经验匹配"},
+            {"archetype": "AI转型顾问", "fit_score": 70, "reason": "标准化推广和团队赋能经验匹配"}
+          ]
+        },
+        {
+          "to": "BIM产品经理",
+          "to_industry": "建筑科技",
+          "overlap_score": 0.85,
+          "overlap_skills": ["需求分析", "方案设计", "项目管理", "跨专业协调", "标准化", "行业知识"],
+          "gaps": [
+            {"gap": "产品方法论", "severity": "medium", "suggestion": "学习产品需求文档（PRD）撰写和用户故事", "estimated_hours": 30},
+            {"gap": "BIM技术深度", "severity": "low", "suggestion": "系统学习Revit/BIM协作平台", "estimated_hours": 20}
+          ],
+          "recommended_archetypes": [
+            {"archetype": "BIM产品经理", "fit_score": 90, "reason": "建筑行业知识+产品设计能力完美匹配"},
+            {"archetype": "BIM数字化经理", "fit_score": 85, "reason": "BIM流程管理和团队协调经验匹配"}
+          ]
+        },
+        {
+          "to": "智慧城市顾问",
+          "to_industry": "智慧城市/政企",
+          "overlap_score": 0.70,
+          "overlap_skills": ["需求分析", "方案设计", "项目管理", "跨专业协调", "行业知识"],
+          "gaps": [
+            {"gap": "IoT/大数据技术", "severity": "high", "suggestion": "学习物联网基础架构和数据平台概念", "estimated_hours": 50},
+            {"gap": "政府项目流程", "severity": "high", "suggestion": "了解政府采购和招投标流程", "estimated_hours": 30},
+            {"gap": "数字孪生技术", "severity": "medium", "suggestion": "学习CIM/数字孪生平台基础", "estimated_hours": 40}
+          ],
+          "recommended_archetypes": [
+            {"archetype": "智慧城市解决方案专家", "fit_score": 75, "reason": "建筑+城市规划背景与智慧城市高度契合"},
+            {"archetype": "数字化转型顾问", "fit_score": 70, "reason": "标准化和流程优化经验可迁移"}
+          ]
+        },
+        {
+          "to": "AI解决方案工程师",
+          "to_industry": "AI/云计算",
+          "overlap_score": 0.65,
+          "overlap_skills": ["需求分析", "方案设计", "项目管理", "跨部门协调", "文档汇报"],
+          "gaps": [
+            {"gap": "AI/ML技术理解", "severity": "high", "suggestion": "系统学习AI基础概念和大模型应用场景", "estimated_hours": 60},
+            {"gap": "云计算平台", "severity": "high", "suggestion": "学习AWS/阿里云基础服务", "estimated_hours": 40},
+            {"gap": "售前技术方案", "severity": "medium", "suggestion": "学习ToB售前方法论和方案撰写", "estimated_hours": 20}
+          ],
+          "recommended_archetypes": [
+            {"archetype": "AI解决方案工程师", "fit_score": 70, "reason": "方案设计和客户沟通经验匹配"},
+            {"archetype": "技术售前", "fit_score": 65, "reason": "文档汇报和投标经验可迁移"}
+          ]
+        }
       ]
     },
-    {
-      "id": "accounting-to-product",
-      "from_industry": "财务/会计",
-      "from_role": "会计师",
-      "to_industry": "互联网",
-      "to_role": "产品经理",
-      "transferable_skills": [
-        {"skill": "数据分析能力", "level": "精通", "reason": "日常处理大量财务数据并做出业务判断"},
-        {"skill": "流程优化", "level": "熟练", "reason": "财务流程设计和优化经验"},
-        {"skill": "细节导向", "level": "精通", "reason": "会计工作的核心要求"},
-        {"skill": "合规意识", "level": "精通", "reason": "熟悉企业合规要求，可迁移到产品合规"},
-        {"skill": "跨部门沟通", "level": "熟练", "reason": "与各部门对接财务数据"}
+    "会计师": {
+      "core_skills": [
+        {"skill": "数据分析", "level": "精通", "description": "日常处理大量财务数据并做出业务判断"},
+        {"skill": "流程优化", "level": "熟练", "description": "财务流程设计和优化经验"},
+        {"skill": "细节导向", "level": "精通", "description": "会计工作的核心要求"},
+        {"skill": "合规意识", "level": "精通", "description": "熟悉企业合规要求，可迁移到产品合规"},
+        {"skill": "跨部门沟通", "level": "熟练", "description": "与各部门对接财务数据"}
       ],
-      "skill_gaps": [
-        {"gap": "用户研究/UX基础", "severity": "high", "suggestion": "学习用户研究方法论，做一个用户访谈项目"},
-        {"gap": "原型设计", "severity": "medium", "suggestion": "掌握Figma基础功能"},
-        {"gap": "技术理解", "severity": "medium", "suggestion": "学习基础SQL和API概念"}
-      ],
-      "recommended_archetypes": [
-        {"archetype": "B端产品经理", "fit_score": 80, "reason": "财务背景熟悉企业级产品需求"},
-        {"archetype": "数据分析师", "fit_score": 75, "reason": "数据处理能力直接匹配"}
+      "typical_transitions": [
+        {
+          "to": "B端产品经理",
+          "to_industry": "互联网/SaaS",
+          "overlap_score": 0.75,
+          "overlap_skills": ["数据分析", "流程优化", "合规意识", "细节导向"],
+          "gaps": [
+            {"gap": "用户研究/UX基础", "severity": "high", "suggestion": "学习用户研究方法论，做一个用户访谈项目", "estimated_hours": 40},
+            {"gap": "原型设计", "severity": "medium", "suggestion": "掌握Figma基础功能", "estimated_hours": 15},
+            {"gap": "技术理解", "severity": "medium", "suggestion": "学习基础SQL和API概念", "estimated_hours": 30}
+          ],
+          "recommended_archetypes": [
+            {"archetype": "B端产品经理", "fit_score": 80, "reason": "财务背景熟悉企业级产品需求"},
+            {"archetype": "数据分析师", "fit_score": 75, "reason": "数据处理能力直接匹配"}
+          ]
+        },
+        {
+          "to": "财务SaaS产品经理",
+          "to_industry": "SaaS/金融科技",
+          "overlap_score": 0.85,
+          "overlap_skills": ["数据分析", "流程优化", "合规意识", "细节导向", "行业知识"],
+          "gaps": [
+            {"gap": "产品设计方法论", "severity": "medium", "suggestion": "学习PRD撰写和用户故事", "estimated_hours": 30},
+            {"gap": "原型设计", "severity": "low", "suggestion": "掌握Figma基础", "estimated_hours": 15}
+          ],
+          "recommended_archetypes": [
+            {"archetype": "财务SaaS产品经理", "fit_score": 90, "reason": "财务专业知识+产品思维高度匹配"},
+            {"archetype": "产品运营", "fit_score": 75, "reason": "数据分析+流程优化经验匹配"}
+          ]
+        }
       ]
     },
-    {
-      "id": "education-to-operations",
-      "from_industry": "教育培训",
-      "from_role": "教师/培训师",
-      "to_industry": "互联网",
-      "to_role": "运营经理",
-      "transferable_skills": [
-        {"skill": "用户运营", "level": "精通", "reason": "管理学生/家长群体，本质是用户运营"},
-        {"skill": "内容产出", "level": "精通", "reason": "教案编写和课件制作能力"},
-        {"skill": "沟通表达", "level": "精通", "reason": "教师核心能力"},
-        {"skill": "数据追踪", "level": "熟练", "reason": "学生成绩跟踪和教学效果评估"},
-        {"skill": "活动策划", "level": "熟练", "reason": "组织教学活动和家长会"}
+    "教师/培训师": {
+      "core_skills": [
+        {"skill": "用户运营", "level": "精通", "description": "管理学生/家长群体，本质是用户运营"},
+        {"skill": "内容产出", "level": "精通", "description": "教案编写和课件制作能力"},
+        {"skill": "沟通表达", "level": "精通", "description": "教师核心能力"},
+        {"skill": "数据追踪", "level": "熟练", "description": "学生成绩跟踪和教学效果评估"},
+        {"skill": "活动策划", "level": "熟练", "description": "组织教学活动和家长会"}
       ],
-      "skill_gaps": [
-        {"gap": "互联网运营工具", "severity": "high", "suggestion": "学习新媒体运营工具链（公众号/小红书/抖音）"},
-        {"gap": "数据分析工具", "severity": "medium", "suggestion": "学习基础Excel数据透视表和SQL"},
-        {"gap": "增长方法论", "severity": "medium", "suggestion": "阅读增长黑客/AARRR模型相关书籍"}
+      "typical_transitions": [
+        {
+          "to": "用户运营",
+          "to_industry": "互联网",
+          "overlap_score": 0.80,
+          "overlap_skills": ["用户运营", "沟通表达", "数据追踪", "活动策划"],
+          "gaps": [
+            {"gap": "互联网运营工具", "severity": "high", "suggestion": "学习新媒体运营工具链（公众号/小红书/抖音）", "estimated_hours": 40},
+            {"gap": "数据分析工具", "severity": "medium", "suggestion": "学习基础Excel数据透视表和SQL", "estimated_hours": 30},
+            {"gap": "增长方法论", "severity": "medium", "suggestion": "阅读增长黑客/AARRR模型相关书籍", "estimated_hours": 20}
+          ],
+          "recommended_archetypes": [
+            {"archetype": "用户运营", "fit_score": 85, "reason": "师生管理经验直接迁移"},
+            {"archetype": "内容运营", "fit_score": 80, "reason": "教案和课件产出能力匹配"}
+          ]
+        },
+        {
+          "to": "教育产品经理",
+          "to_industry": "在线教育",
+          "overlap_score": 0.80,
+          "overlap_skills": ["用户运营", "内容产出", "沟通表达", "数据追踪"],
+          "gaps": [
+            {"gap": "产品设计方法论", "severity": "medium", "suggestion": "学习PRD撰写和用户需求分析", "estimated_hours": 30},
+            {"gap": "技术理解", "severity": "medium", "suggestion": "了解教育科技产品技术架构", "estimated_hours": 20}
+          ],
+          "recommended_archetypes": [
+            {"archetype": "教育产品经理", "fit_score": 85, "reason": "教育行业经验+产品思维匹配"},
+            {"archetype": "课程设计师", "fit_score": 80, "reason": "内容产出能力直接迁移"}
+          ]
+        }
+      ]
+    },
+    "软件工程师": {
+      "core_skills": [
+        {"skill": "编程能力", "level": "精通", "description": "多语言编程和系统设计能力"},
+        {"skill": "系统架构", "level": "熟练", "description": "分布式系统和高可用架构设计"},
+        {"skill": "问题解决", "level": "精通", "description": "复杂技术问题的拆解和解决"},
+        {"skill": "技术文档", "level": "熟练", "description": "技术方案和API文档编写"},
+        {"skill": "代码审查", "level": "熟练", "description": "代码质量把控和团队技术标准"}
       ],
-      "recommended_archetypes": [
-        {"archetype": "用户运营", "fit_score": 85, "reason": "师生管理经验直接迁移"},
-        {"archetype": "内容运营", "fit_score": 80, "reason": "教案和课件产出能力匹配"}
+      "typical_transitions": [
+        {
+          "to": "技术产品经理",
+          "to_industry": "互联网",
+          "overlap_score": 0.70,
+          "overlap_skills": ["系统架构", "问题解决", "技术文档", "代码审查"],
+          "gaps": [
+            {"gap": "用户研究", "severity": "high", "suggestion": "学习用户访谈和可用性测试方法", "estimated_hours": 30},
+            {"gap": "商业思维", "severity": "high", "suggestion": "学习商业模式分析和市场分析", "estimated_hours": 40},
+            {"gap": "原型设计", "severity": "medium", "suggestion": "掌握Figma基础", "estimated_hours": 15}
+          ],
+          "recommended_archetypes": [
+            {"archetype": "技术产品经理", "fit_score": 80, "reason": "技术背景+产品思维天然优势"},
+            {"archetype": "AI产品经理", "fit_score": 75, "reason": "技术理解力强，AI方向学习成本低"}
+          ]
+        }
+      ]
+    },
+    "UI/UX设计师": {
+      "core_skills": [
+        {"skill": "视觉设计", "level": "精通", "description": "品牌视觉和界面设计能力"},
+        {"skill": "用户研究", "level": "熟练", "description": "用户访谈、可用性测试、用户画像"},
+        {"skill": "交互设计", "level": "精通", "description": "信息架构和交互流程设计"},
+        {"skill": "设计系统", "level": "熟练", "description": "组件库和设计规范维护"},
+        {"skill": "原型工具", "level": "精通", "description": "Figma/Sketch等工具熟练使用"}
+      ],
+      "typical_transitions": [
+        {
+          "to": "产品经理",
+          "to_industry": "互联网",
+          "overlap_score": 0.75,
+          "overlap_skills": ["用户研究", "交互设计", "设计系统", "原型工具"],
+          "gaps": [
+            {"gap": "数据分析", "severity": "high", "suggestion": "学习SQL和数据分析方法论", "estimated_hours": 40},
+            {"gap": "商业思维", "severity": "high", "suggestion": "学习商业模式和ROI分析", "estimated_hours": 30},
+            {"gap": "技术理解", "severity": "medium", "suggestion": "了解前端开发基础和API概念", "estimated_hours": 20}
+          ],
+          "recommended_archetypes": [
+            {"archetype": "产品经理", "fit_score": 80, "reason": "用户研究和设计思维是产品的核心能力"},
+            {"archetype": "UX产品经理", "fit_score": 85, "reason": "设计+产品双重能力稀缺"}
+          ]
+        }
       ]
     }
-  ]
+  },
+  "transition_strategies": {
+    "risk_levels": {
+      "low": {
+        "label": "稳健型",
+        "description": "先补硬技能再求职，适合有足够储蓄或时间缓冲的人",
+        "approach": "优先学习→做项目→再投递",
+        "timeline_factor": 1.5
+      },
+      "medium": {
+        "label": "平衡型",
+        "description": "边学边找，学习与求职并行推进",
+        "approach": "学习+投递同步进行，动态调整优先级",
+        "timeline_factor": 1.0
+      },
+      "high": {
+        "label": "激进型",
+        "description": "快速切入，在实际工作中学习",
+        "approach": "先入职再学习，以战代练",
+        "timeline_factor": 0.6
+      }
+    },
+    "learning_paces": {
+      "full-time": {
+        "label": "全职学习",
+        "description": "每天可投入6-8小时学习",
+        "daily_hours": 7
+      },
+      "part-time": {
+        "label": "在职学习",
+        "description": "每天可投入2-3小时学习",
+        "daily_hours": 2.5
+      },
+      "intensive": {
+        "label": "集中冲刺",
+        "description": "短期高强度投入，每天10+小时",
+        "daily_hours": 10
+      }
+    }
+  }
 }

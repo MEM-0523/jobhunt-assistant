@@ -12,10 +12,10 @@ import {
   X,
   Heart,
   Sparkles,
-  Star,
 } from 'lucide-react';
 import client from '../api/client';
 import type { Job } from '../types';
+import FiveDimensionScore from '../components/FiveDimensionScore';
 
 const STATUS_MAP: Record<string, { label: string; color: string }> = {
   new: { label: '新职位', color: 'bg-blue-100 text-blue-700' },
@@ -219,22 +219,12 @@ export default function JobDetail() {
 
           {analysis && !analysis.error && (
             <div className="space-y-3">
-              {/* Score bar */}
-              <div className="flex items-center gap-3 p-3 bg-indigo-50 rounded-lg">
-                <span className="text-2xl font-bold text-indigo-600">{analysis.overall_score}</span>
-                <span className="text-sm text-gray-400">/100</span>
-                {analysis.rating && (
-                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-bold ${
-                    ({A:'text-green-700 bg-green-100',B:'text-blue-700 bg-blue-100',C:'text-yellow-700 bg-yellow-100',D:'text-orange-700 bg-orange-100',F:'text-red-700 bg-red-100'} as Record<string, string>)[analysis.rating] || 'text-gray-600 bg-gray-100'
-                  }`}>
-                    <Star size={12} />
-                    {analysis.rating}级
-                  </span>
-                )}
-                {analysis.prototype && (
-                  <span className="text-xs text-gray-500">原型: {analysis.prototype}</span>
-                )}
-              </div>
+              {/* 5维度评分卡 + 总分 + 分级 */}
+              <FiveDimensionScore data={analysis} />
+
+              {analysis.prototype && (
+                <p className="text-xs text-gray-500">检测原型：{analysis.prototype}</p>
+              )}
 
               {analysis.summary && (
                 <p className="text-sm text-gray-700 bg-white px-3 py-2 rounded border border-gray-100">{analysis.summary}</p>

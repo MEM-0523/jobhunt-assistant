@@ -1,0 +1,39 @@
+# Dependencies
+backend/venv/
+frontend/node_modules/
+
+# Build output
+frontend/dist/
+
+# Environment
+.env
+.env.local
+.env.production
+
+# Database
+*.db
+*.db-journal
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.eggs/
+
+# Playwright
+playwright-browsers/
+
+# Logs
+*.log

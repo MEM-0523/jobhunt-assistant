@@ -8,6 +8,9 @@ const PLATFORMS = [
   { key: '', label: '全部平台' },
   { key: 'BOSS直聘', label: 'BOSS直聘' },
   { key: '猎聘', label: '猎聘' },
+  { key: '前程无忧', label: '前程无忧' },
+  { key: 'Himalayas', label: 'Himalayas' },
+  { key: 'Remotive', label: 'Remotive' },
 ];
 
 const CITY_OPTIONS = [
@@ -107,6 +110,8 @@ export default function SearchPage() {
 
     try {
       const payload: Record<string, unknown> = { city, platform };
+      // 默认自动搜索海外平台
+      payload.include_international = true;
       if (batchMode) {
         payload.keywords = tags;
         payload.keyword = '';
@@ -166,7 +171,7 @@ export default function SearchPage() {
       <div className="bg-white rounded-lg shadow p-6 mb-6">
         <form onSubmit={handleSearch} className="space-y-4">
           {/* Batch Toggle */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-4">
             <button
               type="button"
               onClick={() => setBatchMode(!batchMode)}
@@ -394,6 +399,28 @@ export default function SearchPage() {
       {/* Results */}
       {!loading && results.length > 0 && (
         <>
+          {/* 只有 mock 数据时显示蓝色提示 */}
+          {results.every(r => r.data_source === 'mock') && (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+              <div className="flex items-start gap-3">
+                <Info size={18} className="text-blue-500 flex-shrink-0 mt-0.5" />
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-blue-800 mb-2">当前展示的是参考岗位数据，请到「平台连接」页面登录招聘平台获取真实岗位</p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* 有真实数据时显示绿色提示 */}
+          {results.some(r => ['boss', 'liepin', '51job'].includes(r.data_source || '')) && (
+            <div className="bg-green-50 border border-green-200 rounded-lg p-3 mb-4 flex items-center gap-2">
+              <Info size={16} className="text-green-500 flex-shrink-0" />
+              <span className="text-sm text-green-700">
+                已获取真实岗位数据
+              </span>
+            </div>
+          )}
+
           <div className="flex items-center justify-between mb-4">
             <p className="text-sm text-gray-500">
               共找到 <span className="font-medium text-gray-700">{results.length}</span> 个职位
@@ -418,14 +445,39 @@ export default function SearchPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {results.map((job) => (
               <div key={job.id} className="relative">
-                {job.matched_keyword && (
-                  <div className="absolute top-3 right-3 z-10">
+                <div className="absolute top-3 right-3 z-10 flex flex-col items-end gap-1">
+                  {job.matched_keyword && (
                     <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-indigo-100 text-indigo-700 rounded-full text-xs font-medium">
                       <Tag size={10} />
                       {job.matched_keyword}
                     </span>
-                  </div>
-                )}
+                  )}
+                  {(job.data_source === 'himalayas' || job.data_source === 'remotive') && (
+                    <span className="inline-flex items-center px-2 py-0.5 bg-purple-100 text-purple-700 rounded-full text-xs font-medium">
+                      国际
+                    </span>
+                  )}
+                  {job.data_source === 'boss' && (
+                    <span className="inline-flex items-center px-2 py-0.5 bg-green-100 text-green-700 rounded-full text-xs font-medium">
+                      BOSS直聘
+                    </span>
+                  )}
+                  {job.data_source === 'liepin' && (
+                    <span className="inline-flex items-center px-2 py-0.5 bg-orange-100 text-orange-700 rounded-full text-xs font-medium">
+                      猎聘
+                    </span>
+                  )}
+                  {job.data_source === '51job' && (
+                    <span className="inline-flex items-center px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full text-xs font-medium">
+                      前程无忧
+                    </span>
+                  )}
+                  {job.data_source === 'mock' && (
+                    <span className="inline-flex items-center px-2 py-0.5 bg-gray-100 text-gray-700 rounded-full text-xs font-medium">
+                      参考数据
+                    </span>
+                  )}
+                </div>
                 <JobCard job={job} />
               </div>
             ))}

@@ -23,6 +23,10 @@ class ProfileResponse(BaseModel):
     salary_max: int
     deal_breakers: list
     preferences: dict
+    risk_tolerance: str = "medium"
+    learning_pace: str = "part-time"
+    target_timeline: str = "6months"
+    target_industries: list = []
 
     class Config:
         from_attributes = True
@@ -36,6 +40,10 @@ class ProfileUpdateRequest(BaseModel):
     salary_max: Optional[int] = None
     deal_breakers: Optional[list] = None
     preferences: Optional[dict] = None
+    risk_tolerance: Optional[str] = None
+    learning_pace: Optional[str] = None
+    target_timeline: Optional[str] = None
+    target_industries: Optional[list] = None
 
 
 @router.get("/profile", response_model=ProfileResponse)

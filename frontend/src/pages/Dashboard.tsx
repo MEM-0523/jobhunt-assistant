@@ -18,10 +18,20 @@ import {
   Users,
   Trophy,
   ChevronRight,
+  PieChart as PieChartIcon,
+  Map,
+  Info,
 } from 'lucide-react';
 import { useAuthStore } from '../stores/authStore';
 import client from '../api/client';
-import type { DashboardStats, Profile, WeeklyReport } from '../types';
+import type { Application, DashboardStats, Profile, WeeklyReport } from '../types';
+import {
+  PieChart,
+  Pie,
+  Cell,
+  Tooltip,
+  ResponsiveContainer,
+} from 'recharts';
 
 function timeAgo(dateStr: string): string {
   const now = Date.now();
@@ -99,6 +109,15 @@ export default function Dashboard() {
   const [reportLoading, setReportLoading] = useState(false);
   const [showReport, setShowReport] = useState(false);
 
+  // Heatmap and data source stats
+  const [heatmapData, setHeatmapData] = useState<any[]>([]);
+  const [sourceStats, setSourceStats] = useState<Record<string, number>>({});
+  const [vizLoading, setVizLoading] = useState(false);
+
+  // Recent activities (filterable by demo flag)
+  const [activities, setActivities] = useState<Application[]>([]);
+  const [showDemo, setShowDemo] = useState(false);
+
   useEffect(() => {
     Promise.all([
       client.get('/applications/stats'),
@@ -113,6 +132,29 @@ export default function Dashboard() {
       })
       .finally(() => setLoading(false));
   }, []);
+
+  // Load visualization data
+  useEffect(() => {
+    setVizLoading(true);
+    Promise.all([
+      client.get('/jobs/heatmap'),
+      client.get('/jobs/data-sources'),
+    ])
+      .then(([heatmapRes, sourcesRes]) => {
+        setHeatmapData(heatmapRes.data.heatmap || []);
+        setSourceStats(sourcesRes.data.user_jobs_by_platform || {});
+      })
+      .catch(() => {})
+      .finally(() => setVizLoading(false));
+  }, []);
+
+  // Load recent activities (filtered by demo flag)
+  useEffect(() => {
+    const url = showDemo ? '/applications' : '/applications?is_demo=false';
+    client.get<Application[]>(url)
+      .then((res) => setActivities(res.data))
+      .catch(() => setActivities([]));
+  }, [showDemo]);
 
   const generateWeeklyReport = async () => {
     try {
@@ -246,7 +288,136 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* Funnel */}
+        {/* Data Source Pie Chart + Heatmap */}
+        {!isEmpty && (
+          <div className="lg:col-span-2 grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Data Source Distribution */}
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+              <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                <PieChartIcon size={20} className="text-indigo-500" />
+                数据来源分布
+              </h2>
+              {vizLoading ? (
+                <div className="flex items-center justify-center h-64">
+                  <div className="animate-spin rounded-full h-6 w-6 border-2 border-indigo-600 border-t-transparent" />
+                </div>
+              ) : Object.keys(sourceStats).length === 0 ? (
+                <div className="text-center py-8 text-gray-400 text-sm">暂无数据</div>
+              ) : (
+                <div className="flex items-center">
+                  <ResponsiveContainer width="60%" height={220}>
+                    <PieChart>
+                      <Pie
+                        data={Object.entries(sourceStats).map(([name, value]) => ({ name, value }))}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={50}
+                        outerRadius={90}
+                        paddingAngle={3}
+                        dataKey="value"
+                      >
+                        {Object.entries(sourceStats).map(([name], i) => {
+                          const COLORS = ['#6366f1', '#8b5cf6', '#a78bfa', '#c4b5fd', '#e0e7ff', '#818cf8'];
+                          return <Cell key={name} fill={COLORS[i % COLORS.length]} />;
+                        })}
+                      </Pie>
+                      <Tooltip formatter={(value) => [`${value} 个岗位`, '']} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                  <div className="flex-1 space-y-2">
+                    {Object.entries(sourceStats).map(([name, value], i) => {
+                      const COLORS = ['#6366f1', '#8b5cf6', '#a78bfa', '#c4b5fd', '#e0e7ff', '#818cf8'];
+                      return (
+                        <div key={name} className="flex items-center gap-2 text-sm">
+                          <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: COLORS[i % COLORS.length] }} />
+                          <span className="text-gray-600">{name}</span>
+                          <span className="ml-auto font-medium text-gray-900">{value}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Job Heatmap */}
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+              <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                <Map size={20} className="text-indigo-500" />
+                岗位热度图
+                <span className="text-xs text-gray-400 font-normal ml-2">城市 × 行业</span>
+              </h2>
+              {vizLoading ? (
+                <div className="flex items-center justify-center h-64">
+                  <div className="animate-spin rounded-full h-6 w-6 border-2 border-indigo-600 border-t-transparent" />
+                </div>
+              ) : heatmapData.length === 0 ? (
+                <div className="text-center py-8 text-gray-400 text-sm">
+                  <Info size={24} className="mx-auto mb-2 text-gray-300" />
+                  搜索更多岗位后显示热度图
+                </div>
+              ) : (
+                <div>
+                  {/* Heatmap grid */}
+                  {(() => {
+                    const cities = [...new Set(heatmapData.map((d: any) => d.city))];
+                    const industries = [...new Set(heatmapData.map((d: any) => d.industry))];
+                    const maxCount = Math.max(...heatmapData.map((d: any) => d.count), 1);
+                    const getCell = (city: string, industry: string) =>
+                      heatmapData.find((d: any) => d.city === city && d.industry === industry);
+
+                    return (
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-xs">
+                          <thead>
+                            <tr>
+                              <th className="p-1.5 text-left text-gray-400 font-medium">城市</th>
+                              {industries.map((ind) => (
+                                <th key={ind} className="p-1.5 text-center text-gray-400 font-medium">{ind}</th>
+                              ))}
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {cities.slice(0, 8).map((city) => (
+                              <tr key={city}>
+                                <td className="p-1.5 font-medium text-gray-600 whitespace-nowrap">{city}</td>
+                                {industries.map((industry) => {
+                                  const cell = getCell(city, industry);
+                                  if (!cell) return <td key={industry} className="p-1.5"><div className="h-8 rounded bg-gray-50" /></td>;
+                                  const intensity = Math.max(0.15, cell.count / maxCount);
+                                  const color = cell.avg_salary_k >= 30 ? '#6366f1' :
+                                               cell.avg_salary_k >= 25 ? '#8b5cf6' :
+                                               cell.avg_salary_k >= 20 ? '#a78bfa' : '#c4b5fd';
+                                  return (
+                                    <td key={industry} className="p-1.5">
+                                      <div
+                                        className="h-8 rounded flex flex-col items-center justify-center text-white font-medium cursor-default"
+                                        style={{ backgroundColor: color, opacity: 0.6 + intensity * 0.4 }}
+                                        title={`${city} ${industry}: ${cell.count}个岗位, 均薪${cell.avg_salary_k}K`}
+                                      >
+                                        <span className="text-xs leading-tight">{cell.count}个</span>
+                                        <span className="text-[10px] leading-tight opacity-80">{cell.avg_salary_k}K</span>
+                                      </div>
+                                    </td>
+                                  );
+                                })}
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    );
+                  })()}
+                  <p className="text-xs text-gray-400 mt-2 text-center">
+                    颜色越深 = 岗位越多 / 紫色越深 = 薪资越高
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Existing Funnel + Weekly Changes grid */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
           <h2 className="text-lg font-semibold text-gray-900 mb-4">投递漏斗</h2>
           {isEmpty ? (
@@ -357,28 +528,49 @@ export default function Dashboard() {
 
         {/* Recent Activities */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">最近活动</h2>
-          {!stats?.recent_activities || stats.recent_activities.length === 0 ? (
-            <div className="text-center py-4 text-gray-400 text-sm">
-              {isEmpty ? '开始你的第一次分析' : '暂无活动'}
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold text-gray-900">最近活动</h2>
+            <label className="inline-flex items-center gap-2 cursor-pointer">
+              <span className="text-sm text-gray-500">显示示例数据</span>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={showDemo}
+                onClick={() => setShowDemo((v) => !v)}
+                className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${showDemo ? 'bg-indigo-600' : 'bg-gray-300'}`}
+              >
+                <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${showDemo ? 'translate-x-4' : 'translate-x-1'}`} />
+              </button>
+            </label>
+          </div>
+          {activities.length === 0 ? (
+            <div className="text-center py-8">
+              <p className="text-gray-400 mb-3">还没有活动记录</p>
+              <button onClick={() => navigate('/search')} className="text-indigo-600 hover:text-indigo-700 text-sm font-medium">
+                去搜索岗位开始投递吧 →
+              </button>
             </div>
           ) : (
             <div className="space-y-4">
-              {stats.recent_activities.map((act, i) => (
-                <div key={i} className="flex gap-3">
+              {activities.map((act, i) => (
+                <div key={act.id ?? i} className="flex gap-3">
                   <div className="flex flex-col items-center">
                     <div className="w-2 h-2 rounded-full bg-indigo-400 mt-2" />
-                    {i < stats.recent_activities.length - 1 && (
+                    {i < activities.length - 1 && (
                       <div className="w-px flex-1 bg-gray-200 mt-1" />
                     )}
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm text-gray-700 truncate">
-                      {act.description}
+                      {act.job_title || act.job?.title || '未知岗位'}
+                      {act.company || act.job?.company ? ` · ${act.company || act.job?.company}` : ''}
+                      {act.is_demo && (
+                        <span className="inline-block px-1.5 py-0.5 bg-orange-100 text-orange-600 rounded text-xs ml-1">示例数据</span>
+                      )}
                     </p>
                     <div className="flex items-center gap-1 mt-0.5 text-xs text-gray-400">
                       <Clock size={12} />
-                      <span>{timeAgo(act.created_at)}</span>
+                      <span>{timeAgo(act.applied_at || act.created_at)}</span>
                     </div>
                   </div>
                 </div>

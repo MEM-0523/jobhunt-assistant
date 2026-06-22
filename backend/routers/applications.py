@@ -54,6 +54,7 @@ def _serialize_app(app: Application) -> dict:
         "status": app.status,
         "applied_at": app.applied_at.isoformat() if isinstance(app.applied_at, datetime) else str(app.applied_at) if app.applied_at else None,
         "notes": app.notes or "",
+        "is_demo": bool(app.is_demo),
         "created_at": app.created_at.isoformat() if isinstance(app.created_at, datetime) else str(app.created_at),
         "updated_at": app.updated_at.isoformat() if isinstance(app.updated_at, datetime) else str(app.updated_at),
     }
@@ -74,6 +75,7 @@ class UpdateApplicationRequest(BaseModel):
 @router.get("/applications")
 def list_applications(
     status: Optional[str] = Query(None),
+    is_demo: Optional[bool] = Query(None, description="true=只看Demo记录，false=只看真实记录，不传=全部"),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -89,6 +91,9 @@ def list_applications(
             q = q.filter(Application.status.in_(["offer", "接受", "拒绝"]))
         else:
             q = q.filter(Application.status == status)
+
+    if is_demo is not None:
+        q = q.filter(Application.is_demo.is_(is_demo))
 
     apps = q.order_by(Application.applied_at.desc().nullslast(), Application.created_at.desc()).all()
     return [_serialize_app(a) for a in apps]

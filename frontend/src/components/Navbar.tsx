@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { LogOut, Settings, ChevronDown, Menu } from 'lucide-react';
 import { useAuthStore } from '../stores/authStore';
+import NotificationBell from './NotificationBell';
 
 interface NavbarProps {
   onToggleSidebar?: () => void;
@@ -44,6 +45,8 @@ export default function Navbar({ onToggleSidebar }: NavbarProps) {
       </div>
 
       <div className="flex-1" />
+
+      <NotificationBell />
 
       <div className="relative" ref={dropdownRef}>
         <button

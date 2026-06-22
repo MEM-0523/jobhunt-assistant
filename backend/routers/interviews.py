@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from database import get_db
-from models import User, Application, Job, InterviewReview, Profile
+from models import User, Application, Job, InterviewReview, Profile, InterviewPracticeSession
 from auth import get_current_user
 from datetime import datetime
 from ai_client import call_pinme_llm
@@ -452,3 +452,303 @@ def _serialize_review(r: InterviewReview) -> dict:
         "improvements": r.improvements or "",
         "created_at": r.created_at.isoformat() if isinstance(r.created_at, datetime) else str(r.created_at),
     }
+
+
+# ============================================================
+# 交互式面试训练（参考 JobOK interview-training.md）
+# ============================================================
+
+_PRACTICE_START_PROMPT = """你是一位资深面试官，正在对候选人进行模拟面试。请遵循以下原则：
+
+## 面试规则
+1. **一次只问一个问题**，不要一次抛出多个问题
+2. 根据候选人的回答质量决定是否追问，**针对同一问题最多追问2次**（针对证据弱或表述模糊处）
+3. 追问后若回答仍不清晰，转入下一题，不要纠缠
+4. 态度专业、友好，像真实面试官一样
+
+## 常见问题集（按需选择或基于JD生成）
+- 自我介绍
+- 为什么投这个岗位
+- 讲一个项目经历
+- 团队中具体做了什么
+- 遇到的困难及解决方法
+- 优势和短板
+- 为什么选择这个城市/行业/公司
+- 你有什么问题想问我们
+
+## 输出要求
+请以JSON格式返回（只返回JSON）：
+{{
+  "question": "面试问题（一次只问一个）",
+  "question_type": "self_intro|motivation|project|teamwork|difficulty|strength_weakness|choice|reverse_question|jd_based",
+  "intent": "这个问题想考察什么（一句话）"
+}}
+"""
+
+_PRACTICE_ANSWER_PROMPT = """你是一位资深面试官，正在对候选人的回答进行反馈。请遵循以下原则：
+
+## 反馈规则
+1. **一次只问一个问题**，反馈后如果要追问，只问一个追问问题
+2. 针对同一问题**最多追问2次**（针对证据弱或表述模糊处），超过2次或回答已充分则转入下一题
+3. 反馈要具体、可执行，避免空泛的"很好"或"需要改进"
+
+## 反馈结构
+- what_worked：回答中好的点（具体到哪句话/哪个细节）
+- what_unclear：不清楚或模糊的地方
+- what_not_to_say：不该说的内容（如有）
+- star_improved：用STAR结构改进后的回答
+- practice_drill：一个具体的练习建议
+- next_action：follow_up（追问）/ next_question（下一题）/ end（结束）
+- next_question：如果next_action不是end，提供追问或下一题（一次只问一个）
+
+## next_action 判断依据
+- follow_up：回答有真实经历但证据弱/表述模糊/缺少量化，可追问细节
+- next_question：回答已充分或追问已达2次上限，转入下一题
+- end：已完成所有计划问题或候选人主动结束
+
+## 输出要求
+请以JSON格式返回（只返回JSON）：
+{{
+  "what_worked": "回答中好的点",
+  "what_unclear": "不清楚的地方",
+  "what_not_to_say": "不该说的内容（如无则留空字符串）",
+  "star_improved": "STAR改进版回答",
+  "practice_drill": "一个练习建议",
+  "next_action": "follow_up | next_question | end",
+  "next_question": "追问或下一题（如果next_action是end则留空字符串）"
+}}
+"""
+
+
+class PracticeStartRequest(BaseModel):
+    target_role: str
+    job_description: str = ""
+
+
+class PracticeAnswerRequest(BaseModel):
+    session_id: int
+    answer: str
+
+
+def _serialize_practice_session(s: InterviewPracticeSession) -> dict:
+    return {
+        "id": s.id,
+        "user_id": s.user_id,
+        "target_role": s.target_role or "",
+        "job_description": s.job_description or "",
+        "status": s.status or "active",
+        "current_question": s.current_question or "",
+        "question_type": s.question_type or "general",
+        "follow_up_count": s.follow_up_count or 0,
+        "transcript": s.transcript or [],
+        "created_at": s.created_at.isoformat() if isinstance(s.created_at, datetime) else str(s.created_at),
+        "updated_at": s.updated_at.isoformat() if isinstance(s.updated_at, datetime) else str(s.updated_at),
+    }
+
+
+@router.post("/interviews/practice/start")
+async def practice_start(
+    req: PracticeStartRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """开始面试练习，AI生成第一个面试问题。"""
+    if not req.target_role.strip():
+        raise HTTPException(status_code=400, detail="target_role 不能为空")
+
+    profile_text = _get_profile_text(db, current_user.id)
+
+    user_message = (
+        f"候选人背景：{profile_text}\n"
+        f"目标岗位：{req.target_role}\n"
+    )
+    if req.job_description.strip():
+        user_message += f"岗位JD：\n{req.job_description[:2000]}\n"
+    user_message += "请生成第一个面试问题。"
+
+    try:
+        ai_response = await call_pinme_llm(
+            _PRACTICE_START_PROMPT, user_message,
+            temperature=0.7, max_tokens=800,
+        )
+    except Exception:
+        ai_response = None
+
+    question = "请简单介绍一下你自己。"
+    question_type = "self_intro"
+    intent = "考察候选人的自我认知和岗位匹配度"
+
+    if ai_response:
+        try:
+            json_match = re.search(r'\{[\s\S]*\}', ai_response)
+            if json_match:
+                data = json.loads(json_match.group())
+                question = data.get("question", question)
+                question_type = data.get("question_type", question_type)
+                intent = data.get("intent", intent)
+        except (json.JSONDecodeError, KeyError, TypeError):
+            pass
+
+    session = InterviewPracticeSession(
+        user_id=current_user.id,
+        target_role=req.target_role,
+        job_description=req.job_description,
+        status="active",
+        current_question=question,
+        question_type=question_type,
+        follow_up_count=0,
+        transcript=[
+            {"role": "interviewer", "content": question, "question_type": question_type, "intent": intent},
+        ],
+    )
+    db.add(session)
+    db.commit()
+    db.refresh(session)
+
+    return {
+        "session_id": session.id,
+        "question": question,
+        "question_type": question_type,
+        "intent": intent,
+    }
+
+
+@router.post("/interviews/practice/answer")
+async def practice_answer(
+    req: PracticeAnswerRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """提交回答，AI返回反馈和下一步问题。"""
+    session = (
+        db.query(InterviewPracticeSession)
+        .filter(
+            InterviewPracticeSession.id == req.session_id,
+            InterviewPracticeSession.user_id == current_user.id,
+        )
+        .first()
+    )
+    if not session:
+        raise HTTPException(status_code=404, detail="练习会话不存在")
+
+    if session.status == "ended":
+        raise HTTPException(status_code=400, detail="该练习会话已结束")
+
+    if not req.answer.strip():
+        raise HTTPException(status_code=400, detail="回答内容不能为空")
+
+    profile_text = _get_profile_text(db, current_user.id)
+    transcript_text = _format_transcript(session.transcript or [])
+
+    user_message = (
+        f"候选人背景：{profile_text}\n"
+        f"目标岗位：{session.target_role}\n"
+    )
+    if session.job_description:
+        user_message += f"岗位JD：\n{session.job_description[:2000]}\n"
+    user_message += (
+        f"\n## 当前面试进度\n"
+        f"已追问次数：{session.follow_up_count}/2\n"
+        f"\n## 对话历史\n{transcript_text}\n"
+        f"\n## 候选人最新回答\n{req.answer}\n"
+        f"\n请对以上回答给出反馈，并决定下一步。"
+    )
+
+    try:
+        ai_response = await call_pinme_llm(
+            _PRACTICE_ANSWER_PROMPT, user_message,
+            temperature=0.7, max_tokens=1500,
+        )
+    except Exception:
+        ai_response = None
+
+    feedback = {
+        "what_worked": "",
+        "what_unclear": "",
+        "what_not_to_say": "",
+        "star_improved": "",
+        "practice_drill": "",
+        "next_action": "next_question",
+        "next_question": "请讲一个你遇到困难并解决的项目经历。",
+    }
+
+    if ai_response:
+        try:
+            json_match = re.search(r'\{[\s\S]*\}', ai_response)
+            if json_match:
+                data = json.loads(json_match.group())
+                for key in feedback:
+                    if key in data:
+                        feedback[key] = data[key]
+        except (json.JSONDecodeError, KeyError, TypeError):
+            pass
+
+    # Enforce follow-up limit: max 2 follow-ups per question
+    next_action = feedback.get("next_action", "next_question")
+    if next_action == "follow_up" and session.follow_up_count >= 2:
+        next_action = "next_question"
+        feedback["next_action"] = "next_question"
+        if not feedback.get("next_question"):
+            feedback["next_question"] = "请讲一个你遇到困难并解决的项目经历。"
+
+    # Update session state
+    transcript = session.transcript or []
+    transcript.append({"role": "candidate", "content": req.answer})
+    transcript.append({
+        "role": "interviewer",
+        "content": feedback.get("next_question", ""),
+        "feedback": feedback,
+    })
+
+    if next_action == "follow_up":
+        session.follow_up_count = (session.follow_up_count or 0) + 1
+        session.current_question = feedback.get("next_question", session.current_question)
+    elif next_action == "next_question":
+        session.follow_up_count = 0
+        session.current_question = feedback.get("next_question", "")
+    else:  # end
+        session.status = "ended"
+
+    session.transcript = transcript
+    session.updated_at = datetime.utcnow()
+    db.commit()
+    db.refresh(session)
+
+    return {
+        "session_id": session.id,
+        "feedback": feedback,
+        "next_action": next_action,
+        "next_question": feedback.get("next_question", ""),
+        "follow_up_count": session.follow_up_count,
+        "status": session.status,
+    }
+
+
+@router.get("/interviews/practice/history")
+def practice_history(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """获取用户的练习会话列表。"""
+    sessions = (
+        db.query(InterviewPracticeSession)
+        .filter(InterviewPracticeSession.user_id == current_user.id)
+        .order_by(InterviewPracticeSession.created_at.desc())
+        .all()
+    )
+    return [_serialize_practice_session(s) for s in sessions]
+
+
+def _format_transcript(transcript: list) -> str:
+    """Format transcript list into readable text for AI context."""
+    if not transcript:
+        return "(无对话历史)"
+    lines = []
+    for item in transcript:
+        role = item.get("role", "")
+        content = item.get("content", "")
+        if role == "interviewer":
+            lines.append(f"面试官：{content}")
+        elif role == "candidate":
+            lines.append(f"候选人：{content}")
+    return "\n".join(lines)

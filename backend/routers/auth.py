@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 from database import get_db
 from models import User
 from auth import get_password_hash, verify_password, create_access_token, get_current_user
+from seed import seed_demo_data
 
 router = APIRouter(tags=["auth"])
 
@@ -46,6 +47,8 @@ def register(req: RegisterRequest, db: Session = Depends(get_db)):
     db.add(user)
     db.commit()
     db.refresh(user)
+
+    seed_demo_data(user.id, db)
 
     token = create_access_token({"sub": user.id})
     return AuthResponse(

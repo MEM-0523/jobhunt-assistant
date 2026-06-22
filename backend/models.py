@@ -1,5 +1,5 @@
 from datetime import datetime
-from sqlalchemy import Column, Integer, String, Float, Text, JSON, DateTime, ForeignKey, Boolean
+from sqlalchemy import Column, Integer, String, Float, Text, JSON, DateTime, ForeignKey, Boolean, UniqueConstraint
 from sqlalchemy.orm import relationship
 from database import Base
 
@@ -20,6 +20,9 @@ class User(Base):
     interview_reviews = relationship("InterviewReview", back_populates="user")
     feedbacks = relationship("Feedback", back_populates="user")
     favorites = relationship("JobFavorite", back_populates="user")
+    notifications = relationship("Notification", back_populates="user")
+    experiences = relationship("Experience", back_populates="user")
+    strengths = relationship("Strength", back_populates="user")
 
 
 class Profile(Base):
@@ -34,6 +37,11 @@ class Profile(Base):
     salary_max = Column(Integer, default=0)
     deal_breakers = Column(JSON, default=[])
     preferences = Column(JSON, default={})
+    # Career transition personalization fields
+    risk_tolerance = Column(String, default="medium")  # low/medium/high
+    learning_pace = Column(String, default="part-time")  # full-time/part-time/intensive
+    target_timeline = Column(String, default="6months")  # 3months/6months/12months
+    target_industries = Column(JSON, default=[])  # e.g. ["AI/互联网", "智慧城市"]
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -55,6 +63,7 @@ class Job(Base):
     rating = Column(Integer, default=0)
     status = Column(String, default="new")
     jd_url = Column(String, default="")
+    data_source = Column(String, default="")
     created_at = Column(DateTime, default=datetime.utcnow)
 
     user = relationship("User", back_populates="jobs")
@@ -82,6 +91,7 @@ class Application(Base):
     status = Column(String, default="applied")
     applied_at = Column(DateTime, default=datetime.utcnow)
     notes = Column(Text, default="")
+    is_demo = Column(Boolean, default=False)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -164,3 +174,101 @@ class JobCache(Base):
     raw_data = Column(JSON, default={})
     fetched_at = Column(DateTime, default=datetime.utcnow)
     expires_at = Column(DateTime, nullable=True)
+
+
+class Notification(Base):
+    __tablename__ = "notifications"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    type = Column(String(50), default="info")  # info/success/warning/reminder
+    title = Column(String(255), default="")
+    message = Column(Text, default="")
+    is_read = Column(Boolean, default=False)
+    link = Column(String(500), default="")  # 点击跳转链接
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    user = relationship("User", back_populates="notifications")
+
+
+class Experience(Base):
+    __tablename__ = "experiences"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    type = Column(String(50), default="project")  # project/internship/course/club/self_study/part_time
+    title = Column(String(255), default="")
+    background = Column(Text, default="")
+    task = Column(Text, default="")
+    action = Column(Text, default="")
+    method_tool = Column(Text, default="")
+    result = Column(Text, default="")
+    evidence = Column(Text, default="")
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    user = relationship("User", back_populates="experiences")
+
+
+class Strength(Base):
+    __tablename__ = "strengths"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    name = Column(String(255), default="")
+    classification = Column(String(50), default="fact")  # fact/assumption/inference
+    evidence = Column(Text, default="")
+    behavior = Column(Text, default="")
+    ability = Column(Text, default="")
+    job_signal = Column(Text, default="")
+    confidence = Column(String(20), default="medium")  # high/medium/low
+    missing_proof = Column(Text, default="")
+    next_action = Column(Text, default="")
+    created_at = Column(DateTime, default=datetime.utcnow)
+    user = relationship("User", back_populates="strengths")
+
+
+class InterviewPracticeSession(Base):
+    """Stores interactive interview practice sessions."""
+    __tablename__ = "interview_practice_sessions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    target_role = Column(String(255), default="")
+    job_description = Column(Text, default="")
+    status = Column(String(20), default="active")  # active/ended
+    current_question = Column(Text, default="")
+    question_type = Column(String(50), default="general")
+    follow_up_count = Column(Integer, default=0)
+    transcript = Column(JSON, default=[])  # list of {role, content, ...}
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    user = relationship("User")
+
+
+class PlatformAuth(Base):
+    """招聘平台登录凭证"""
+    __tablename__ = "platform_auths"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    # 平台标识：boss / liepin / 51job
+    platform = Column(String(20), nullable=False, index=True)
+    # Cookie JSON 字符串（BOSS直聘、前程无忧用）
+    cookies = Column(Text, nullable=True)
+    # 猎聘 MCP Token（猎聘用）
+    token = Column(Text, nullable=True)
+    # 状态：active / expired / disconnected
+    status = Column(String(20), default="disconnected", nullable=False)
+    # 过期时间
+    expires_at = Column(DateTime, nullable=True)
+    # Playwright 用户数据目录路径（每个用户每个平台独立）
+    user_data_dir = Column(String(255), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # 关联用户
+    user = relationship("User")
+
+    # 唯一约束：一个用户一个平台只能有一条记录
+    __table_args__ = (UniqueConstraint('user_id', 'platform', name='_user_platform_uc'),)

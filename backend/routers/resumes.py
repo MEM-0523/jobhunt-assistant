@@ -38,6 +38,8 @@ class KeywordSuggestionResponse(BaseModel):
     original: str
     replacement: str
     reason: str
+    label: str = "rewrite"
+    label_reason: str = ""
 
 
 class StageResult(BaseModel):
@@ -53,6 +55,7 @@ class PipelineResponse(BaseModel):
     overall_score: int = 0
     final_content: str = ""
     summary: str = ""
+    suggestions: list[dict] = []
 
 
 class OptimizationResponse(BaseModel):
@@ -60,6 +63,7 @@ class OptimizationResponse(BaseModel):
     keyword_suggestions: list[KeywordSuggestionResponse]
     improvement_suggestions: list[str]
     optimized_content: str
+    suggestions: list[dict] = []
 
 
 class ExportRequest(BaseModel):
@@ -162,7 +166,7 @@ _PIPELINE_STAGES = [
     (6, "人工把关", "提供修改后的简历润色检查清单和投递建议"),
 ]
 
-_PIPELINE_SYSTEM_PROMPT = """你是一个资深职业顾问和简历优化专家。请完成简历优化的6个阶段工作。
+_PIPELINE_SYSTEM_PROMPT = """你是一个资深职业顾问和简历优化专家。请完成简历优化的6个阶段工作，并为每条优化建议打上标签。
 
 候选人原始简历：
 {resume_content}
@@ -172,6 +176,16 @@ _PIPELINE_SYSTEM_PROMPT = """你是一个资深职业顾问和简历优化专家
 岗位：{title}
 JD：
 {jd_text}
+
+## 标签系统（每条优化建议必须打标签）
+
+对每条优化建议，必须从以下5个标签中选择一个，并说明打标理由：
+
+- **use_as_is**：可以直接使用，仅需轻微编辑。原文表述清晰、有证据支撑、与JD匹配。
+- **rewrite**：有真实证据但表述较弱，需要改写。原文有真实经历但量化不足/动词弱/结构散。
+- **needs_proof**：看起来有吸引力但缺少证据支持。如"精通Python"但经历中无Python项目。
+- **remove**：无支撑、无关、有风险或编造的内容。如与JD无关的经历、无法验证的技能声明。
+- **ask_user**：需要追问用户后再编辑。如关键信息缺失、表述歧义、需要确认真实性。
 
 请严格按照以下JSON格式返回结果（6个阶段全部完成）：
 {{
@@ -211,6 +225,15 @@ JD：
       "name": "人工把关",
       "description": "描述",
       "content": "markdown格式，包括：1.简历自查清单（5-7条）2.投递策略建议 3.补充材料建议（作品集/求职信等）"
+    }}
+  ],
+  "suggestions": [
+    {{
+      "label": "use_as_is|rewrite|needs_proof|remove|ask_user",
+      "reason": "打标理由，说明为什么选择这个标签",
+      "original": "简历中的原文内容（如适用）",
+      "suggestion": "建议内容/修改方向",
+      "section": "所属简历板块（如：个人优势/工作经历/项目经验/技能/教育）"
     }}
   ],
   "overall_score": 78,
@@ -271,11 +294,13 @@ async def optimize_pipeline(
                         if s.stage == 4:
                             final_content = s.content
                             break
+                    suggestions = data.get("suggestions", []) or []
                     return PipelineResponse(
                         stages=stages,
                         overall_score=data.get("overall_score", 0),
                         final_content=final_content,
                         summary=data.get("summary", ""),
+                        suggestions=suggestions,
                     )
         except (json.JSONDecodeError, KeyError, TypeError):
             pass
@@ -314,7 +339,37 @@ def _pipeline_mock_result() -> PipelineResponse:
         stages=mock_stages,
         overall_score=72,
         final_content=mock_stages[3].content,
-        summary="AI服务暂不可用，已生成基础优化方案。建议手动调整后投递。"
+        summary="AI服务暂不可用，已生成基础优化方案。建议手动调整后投递。",
+        suggestions=[
+            {
+                "label": "rewrite",
+                "reason": "原文'负责项目设计'表述较弱，缺少量化数据，建议改写为'主导完成15+个大型商业综合体方案设计'",
+                "original": "负责项目设计",
+                "suggestion": "主导完成15+个大型商业综合体方案设计，总面积超50万㎡",
+                "section": "工作经历",
+            },
+            {
+                "label": "needs_proof",
+                "reason": "简历中声称'熟悉AI辅助设计工具'但未列出具体工具和成果，需要补充证据",
+                "original": "熟悉AI辅助设计工具",
+                "suggestion": "补充具体工具名称（Stable Diffusion/Midjourney/ComfyUI）和应用案例",
+                "section": "技能",
+            },
+            {
+                "label": "use_as_is",
+                "reason": "国家一级注册建筑师资质是硬性证书，可直接使用",
+                "original": "国家一级注册建筑师",
+                "suggestion": "保持原样，建议在个人优势中前置突出",
+                "section": "个人优势",
+            },
+            {
+                "label": "ask_user",
+                "reason": "教育背景中MEM在读信息需要确认预计毕业时间和方向",
+                "original": "浙江大学 | 工程管理硕士（MEM） | 在读",
+                "suggestion": "请确认MEM预计毕业时间和研究方向，以便更精准匹配岗位",
+                "section": "教育背景",
+            },
+        ],
     )
 
 
@@ -338,15 +393,28 @@ async def optimize_resume(
         raise HTTPException(status_code=404, detail="职位不存在")
 
     # Try real AI resume optimization
-    system_prompt = """你是一个专业的简历优化顾问。根据职位描述(JD)和候选人的原始简历，提供简历优化建议。
+    system_prompt = """你是一个专业的简历优化顾问。根据职位描述(JD)和候选人的原始简历，提供简历优化建议，并为每条建议打上标签。
+
+## 标签系统（每条优化建议必须打标签）
+
+对每条优化建议（包括 keyword_suggestions 和 suggestions），必须从以下5个标签中选择一个，并说明打标理由：
+
+- **use_as_is**：可以直接使用，仅需轻微编辑。原文表述清晰、有证据支撑、与JD匹配。
+- **rewrite**：有真实证据但表述较弱，需要改写。原文有真实经历但量化不足/动词弱/结构散。
+- **needs_proof**：看起来有吸引力但缺少证据支持。如"精通Python"但经历中无Python项目。
+- **remove**：无支撑、无关、有风险或编造的内容。如与JD无关的经历、无法验证的技能声明。
+- **ask_user**：需要追问用户后再编辑。如关键信息缺失、表述歧义、需要确认真实性。
 
 请以JSON格式返回（只返回JSON）：
 {
   "ats_score": 72,
   "keyword_suggestions": [
-    {"original": "原文", "replacement": "建议替换为", "reason": "原因"}
+    {"original": "原文", "replacement": "建议替换为", "reason": "原因", "label": "rewrite", "label_reason": "打标理由"}
   ],
   "improvement_suggestions": ["建议1", "建议2", "建议3"],
+  "suggestions": [
+    {"label": "use_as_is|rewrite|needs_proof|remove|ask_user", "reason": "打标理由", "original": "原文内容", "suggestion": "建议内容", "section": "所属板块"}
+  ],
   "optimized_content": "优化后的完整简历(markdown格式)"
 }"""
 
@@ -363,14 +431,22 @@ async def optimize_resume(
             if json_match:
                 data = json.loads(json_match.group())
                 if "ats_score" in data:
+                    keyword_suggestions = []
+                    for kw in data.get("keyword_suggestions", []):
+                        if isinstance(kw, dict):
+                            keyword_suggestions.append(KeywordSuggestionResponse(
+                                original=kw.get("original", ""),
+                                replacement=kw.get("replacement", ""),
+                                reason=kw.get("reason", ""),
+                                label=kw.get("label", "rewrite"),
+                                label_reason=kw.get("label_reason", kw.get("reason", "")),
+                            ))
                     return OptimizationResponse(
                         ats_score=data.get("ats_score", 72),
-                        keyword_suggestions=[
-                            KeywordSuggestionResponse(**kw)
-                            for kw in data.get("keyword_suggestions", [])
-                        ],
+                        keyword_suggestions=keyword_suggestions,
                         improvement_suggestions=data.get("improvement_suggestions", []),
                         optimized_content=data.get("optimized_content", resume.content),
+                        suggestions=data.get("suggestions", []) or [],
                     )
         except (json.JSONDecodeError, KeyError, TypeError):
             pass
@@ -382,17 +458,23 @@ async def optimize_resume(
         KeywordSuggestionResponse(
             original="负责项目设计",
             replacement="主导产品方案设计",
-            reason=f"与JD关键词'产品方案设计'匹配"
+            reason=f"与JD关键词'产品方案设计'匹配",
+            label="rewrite",
+            label_reason="原文表述较弱，建议改写为更主动的动词",
         ),
         KeywordSuggestionResponse(
             original="团队协作",
             replacement="跨部门协调",
-            reason="JD强调跨部门协作能力"
+            reason="JD强调跨部门协作能力",
+            label="rewrite",
+            label_reason="原文'团队协作'过于笼统，'跨部门协调'更精准匹配JD",
         ),
         KeywordSuggestionResponse(
             original="参与方案设计",
             replacement="主导完成方案设计",
-            reason="强化主动性描述，提升简历竞争力"
+            reason="强化主动性描述，提升简历竞争力",
+            label="rewrite",
+            label_reason="'参与'弱化了贡献度，建议改为'主导完成'并补充量化数据",
         ),
     ]
 
@@ -404,11 +486,43 @@ async def optimize_resume(
         "教育背景处补充GPA或核心课程（如适用）",
     ]
 
+    suggestions = [
+        {
+            "label": "rewrite",
+            "reason": "个人优势部分缺少量化钩子，建议补充'9年经验''30+项目'等数据",
+            "original": "国家一级注册建筑师，具备10年+建筑设计经验",
+            "suggestion": "国家一级注册建筑师，9年建筑全流程经验，主导30+个大型项目方案设计",
+            "section": "个人优势",
+        },
+        {
+            "label": "needs_proof",
+            "reason": "简历中声称'熟悉AI辅助设计工具'但未列出具体工具和成果，需要补充证据",
+            "original": "熟悉AI辅助设计工具",
+            "suggestion": "列出具体工具（Stable Diffusion/Midjourney/ComfyUI）和应用案例",
+            "section": "技能",
+        },
+        {
+            "label": "use_as_is",
+            "reason": "国家一级注册建筑师资质是硬性证书，可直接使用，建议前置突出",
+            "original": "国家一级注册建筑师",
+            "suggestion": "保持原样，建议在个人优势开头突出",
+            "section": "个人优势",
+        },
+        {
+            "label": "ask_user",
+            "reason": "MEM在读信息需要确认预计毕业时间和研究方向",
+            "original": "浙江大学 | 工程管理硕士（MEM） | 在读",
+            "suggestion": "请确认MEM预计毕业时间和研究方向，以便更精准匹配岗位",
+            "section": "教育背景",
+        },
+    ]
+
     return OptimizationResponse(
         ats_score=72,
         keyword_suggestions=keyword_suggestions,
         improvement_suggestions=improvement_suggestions,
         optimized_content=optimized,
+        suggestions=suggestions,
     )
 
 

@@ -1,5 +1,7 @@
 # 开发者指南
 
+> 版本：v2.0 | 日期：2026-06-22 | 状态：本地运行
+
 ## 一、技术架构
 
 ```
@@ -12,16 +14,23 @@
                      │ JWT Bearer Token
 ┌────────────────────▼────────────────────────────┐
 │               FastAPI 后端服务                     │
-│         Python 3.x + SQLAlchemy ORM              │
+│         Python 3.9 + SQLAlchemy ORM              │
 │              SQLite 数据库 (本地)                   │
 └────────────────────┬────────────────────────────┘
-                     │ 子进程调用
-┌────────────────────▼────────────────────────────┐
-│              外部服务（可选）                       │
-│   • autocli search-jobs (命令行搜索岗位)           │
-│   • lark-cli bitable (飞书反馈同步)               │
-│   • AI API (GPT-4o-mini, 未来)                   │
-└─────────────────────────────────────────────────┘
+                     │
+     ┌───────────────┼───────────────┐
+     ▼               ▼               ▼
+┌─────────┐  ┌──────────────┐  ┌──────────┐
+│ 猎聘MCP  │  │Playwright爬虫 │  │ 国际API  │
+│  API    │  │BOSS直聘/51job │  │Himalayas │
+│         │  │              │  │Remotive  │
+└─────────┘  └──────────────┘  └──────────┘
+                     │
+                     ▼
+            ┌──────────────┐
+            │  Pinme AI    │
+            │  (gpt-4o-mini)│
+            └──────────────┘
 ```
 
 ### 技术选型
@@ -29,12 +38,12 @@
 | 层 | 技术 | 说明 |
 |---|------|------|
 | 前端框架 | React 19 | 最新稳定版 |
-| 类型系统 | TypeScript 6.0 | 全量类型覆盖 |
-| 构建工具 | Vite 8.0 | 极速HMR |
+| 类型系统 | TypeScript | 全量类型覆盖 |
+| 构建工具 | Vite | 极速HMR |
 | CSS框架 | Tailwind CSS 3.4 | 原子化CSS |
-| 状态管理 | Zustand 5.0 | 轻量级 |
-| 路由 | React Router 7.15 | SPA路由 |
-| 图表 | Recharts 3.8 | 漏斗图/统计图 |
+| 状态管理 | Zustand | 轻量级 |
+| 路由 | React Router 7 | SPA路由 |
+| 图表 | Recharts | 漏斗图/统计图 |
 | 图标 | Lucide React | SVG图标库 |
 | HTTP客户端 | Axios | 请求拦截器支持JWT |
 | 后端框架 | FastAPI 0.115 | 异步Python Web |
@@ -42,7 +51,9 @@
 | 数据库 | SQLite | 零配置本地数据库 |
 | 认证 | python-jose (JWT) | 无状态Token认证 |
 | 密码加密 | passlib + bcrypt | 安全哈希 |
-| 部署 | Pinme Platform | Pages + API |
+| AI | Pinme API (gpt-4o-mini) | JD分析/简历优化/面试方案 |
+| 爬虫 | Playwright | BOSS直聘/前程无忧反检测 |
+| 部署 | 本地运行 | 云端部署暂停 |
 
 ---
 
@@ -51,68 +62,92 @@
 ```
 12-求职助手Web/
 ├── frontend/                    # React 前端
-│   ├── public/
-│   │   ├── favicon.svg
-│   │   └── icons.svg
 │   ├── src/
 │   │   ├── api/
 │   │   │   └── client.ts        # Axios 实例 + JWT 拦截器
-│   │   ├── assets/
-│   │   │   └── hero.png
 │   │   ├── components/
 │   │   │   ├── JobCard.tsx      # 岗位卡片组件
-│   │   │   ├── Layout.tsx       # 页面布局（导航+内容区）
+│   │   │   ├── Layout.tsx       # 页面布局（侧边栏+内容区）
 │   │   │   ├── Navbar.tsx       # 顶部导航栏
-│   │   │   └── ProtectedRoute.tsx  # 登录保护路由
+│   │   │   ├── PageSkeleton.tsx # 全局加载骨架屏
+│   │   │   ├── ProtectedRoute.tsx  # 登录保护路由
+│   │   │   ├── NotificationBell.tsx  # 通知铃铛
+│   │   │   └── FiveDimensionScore.tsx  # 五维度评分雷达图
 │   │   ├── pages/
-│   │   │   ├── Dashboard.tsx    # 工作台/首页
-│   │   │   ├── Search.tsx       # 岗位搜索页
+│   │   │   ├── Dashboard.tsx    # 工作台/数据看板
+│   │   │   ├── Search.tsx       # 岗位搜索（5平台聚合）
 │   │   │   ├── JobDetail.tsx    # 岗位详情 + JD分析
-│   │   │   ├── Resume.tsx       # 简历管理页
-│   │   │   ├── ApplicationTracking.tsx  # 投递追踪页
-│   │   │   ├── InterviewPrep.tsx  # 面试准备页
+│   │   │   ├── JDDirectAnalyze.tsx  # JD直推分析（粘贴JD文本）
+│   │   │   ├── Resume.tsx       # 简历管理 + AI优化
+│   │   │   ├── Applications.tsx # 投递追踪 + 漏斗分析
+│   │   │   ├── InterviewPrep.tsx  # 面试准备（AI全案生成）
+│   │   │   ├── InterviewPractice.tsx  # AI模拟面试训练
+│   │   │   ├── CareerAssessment.tsx   # 职业测评（霍兰德+大五人格）
+│   │   │   ├── CareerTransition.tsx   # 能力迁移路径分析
+│   │   │   ├── ExperienceAssets.tsx   # 经历资产管理
+│   │   │   ├── StrengthAnalysis.tsx   # 优势分析诊断
+│   │   │   ├── Favorites.tsx    # 岗位收藏
+│   │   │   ├── PlatformAuth.tsx # 平台授权管理
 │   │   │   ├── Login.tsx        # 登录页
 │   │   │   ├── Register.tsx     # 注册页
-│   │   │   └── Settings.tsx     # 个人设置页
+│   │   │   └── Settings.tsx     # 个人设置
 │   │   ├── stores/
 │   │   │   └── authStore.ts     # Zustand 认证状态
 │   │   ├── types/
-│   │   │   └── index.ts         # 全部 TypeScript 类型定义
-│   │   ├── App.tsx              # 路由配置
+│   │   │   └── index.ts         # TypeScript 类型定义
+│   │   ├── utils/
+│   │   │   └── assessment.ts    # 测评工具函数
+│   │   ├── data/
+│   │   │   └── transitionCases.ts  # 转型案例数据
+│   │   ├── App.tsx              # 路由配置 + Suspense
 │   │   ├── main.tsx             # 入口文件
 │   │   └── index.css            # 全局样式 + Tailwind 指令
-│   ├── .env.example             # 环境变量模板
 │   ├── index.html               # HTML 入口
 │   ├── package.json             # 依赖配置
 │   ├── vite.config.ts           # Vite 配置
 │   ├── tailwind.config.js       # Tailwind 配置
-│   ├── tsconfig.json            # TypeScript 配置
-│   └── wrangler.toml            # Pinme Pages 部署配置
+│   └── tsconfig.json            # TypeScript 配置
 │
 ├── backend/                     # FastAPI 后端
 │   ├── routers/
-│   │   ├── __init__.py
 │   │   ├── auth.py             # 注册/登录/用户信息
 │   │   ├── profile.py          # 个人画像 CRUD
-│   │   ├── jobs.py             # 岗位搜索/详情/JD分析
+│   │   ├── jobs.py             # 岗位搜索/详情/分析/收藏/统计
 │   │   ├── resumes.py          # 简历上传/列表/优化
 │   │   ├── applications.py     # 投递追踪/状态流转/统计
-│   │   ├── interviews.py       # 面试方案生成/列表
-│   │   └── feedback.py         # 用户反馈
+│   │   ├── interviews.py       # 面试方案生成/模拟训练
+│   │   ├── career.py           # 职业测评/转型路径
+│   │   ├── experiences.py      # 经历资产管理
+│   │   ├── strengths.py        # 优势分析
+│   │   ├── feedback.py         # 用户反馈
+│   │   ├── notifications.py    # 通知管理
+│   │   ├── platform_auth.py    # 招聘平台授权
+│   │   └── seed.py             # 种子数据
+│   ├── utils/
+│   │   └── file_parser.py      # 文件解析（PDF/Word）
+│   ├── ai_client.py            # AI API 客户端
 │   ├── auth.py                 # JWT 工具函数 + 认证依赖
 │   ├── database.py             # 数据库连接 + Session 管理
-│   ├── models.py               # SQLAlchemy 数据模型 (6张表)
+│   ├── job_sources.py          # 国际岗位数据源（Himalayas/Remotive）
+│   ├── liepin_mcp_client.py    # 猎聘MCP API客户端
+│   ├── models.py               # SQLAlchemy 数据模型（14张表）
+│   ├── playwright_crawler.py   # Playwright爬虫核心
 │   ├── main.py                 # FastAPI 入口 + 路由注册
 │   ├── requirements.txt        # Python 依赖
-│   └── wrangler.toml           # Pinme API 部署配置
+│   └── .env                    # 环境变量
 │
 ├── docs/                        # 文档
+│   ├── archive/                 # 历史文档归档
 │   ├── business-plan.md        # 商业化可行性分析
 │   ├── user-guide.md           # 用户使用指南
-│   └── developer-guide.md      # 开发者指南（本文件）
+│   ├── developer-guide.md      # 开发者指南（本文件）
+│   ├── 项目规划-v1.0.md        # 项目规划
+│   └── 部署指南-v1.0.md        # 部署指南
 │
 ├── README.md                    # 项目 README
-└── deploy.sh                    # 一键部署脚本
+├── FEATURE_MATRIX.md            # 功能矩阵
+├── PRODUCT_POSITIONING.md       # 产品定位
+└── Dockerfile                   # Docker 配置
 ```
 
 ---
@@ -122,8 +157,9 @@
 ### 环境要求
 
 - Node.js 18+
-- Python 3.10+
+- Python 3.9+
 - npm 或 pnpm
+- Playwright（用于BOSS直聘/前程无忧爬虫）
 
 ### 前端开发
 
@@ -140,6 +176,7 @@ npm run dev
 ```bash
 cd backend
 pip install -r requirements.txt
+playwright install chromium  # 安装Playwright浏览器
 uvicorn main:app --reload --host 0.0.0.0 --port 8000
 ```
 
@@ -147,25 +184,20 @@ API 运行在 `http://localhost:8000`，自动生成 Swagger 文档在 `http://l
 
 ### 环境变量
 
-**前端** `.env`：
-
-| 变量 | 说明 | 默认值 |
-|------|------|--------|
-| `VITE_API_URL` | 后端 API 地址 | `http://localhost:8000` |
-
 **后端** `.env`：
 
 | 变量 | 说明 | 默认值 |
 |------|------|--------|
 | `JWT_SECRET_KEY` | JWT 签名密钥 | 开发默认值（生产环境务必修改） |
-| `AI_API_KEY` | AI 服务 API 密钥 | 空（使用内置模拟分析） |
-| `FEISHU_APP_TOKEN` | 飞书应用 Token | 空 |
+| `PINME_API_KEY` | Pinme AI API 密钥 | 必填 |
+| `PINME_API_BASE` | Pinme API 地址 | `https://api.pinme.dev/v1` |
+| `CORS_ALLOW_ORIGINS` | CORS 允许域名 | 本地开发默认值 |
 
 ### 数据库
 
 - 使用 SQLite，数据库文件 `backend/job_assistant.db`，首次启动自动创建
 - 表结构由 `models.py` 定义，启动时通过 `lifespan` 自动 `create_all`
-- 无需手动执行迁移
+- 共 14 张表：users, profiles, jobs, job_favorites, job_cache, applications, resumes, interview_preps, interview_reviews, interview_practice_sessions, feedbacks, notifications, experiences, strengths, platform_auths
 
 ---
 
@@ -175,8 +207,8 @@ API 运行在 `http://localhost:8000`，自动生成 Swagger 文档在 `http://l
 
 | 方法 | 路径 | 说明 | 认证 |
 |------|------|------|------|
-| POST | `/api/auth/register` | 注册新用户（email + password） | 否 |
-| POST | `/api/auth/login` | 登录（返回 JWT token） | 否 |
+| POST | `/api/auth/register` | 注册新用户 | 否 |
+| POST | `/api/auth/login` | 登录（返回JWT token） | 否 |
 | GET | `/api/auth/me` | 获取当前用户信息 | 是 |
 
 ### 个人画像
@@ -184,30 +216,46 @@ API 运行在 `http://localhost:8000`，自动生成 Swagger 文档在 `http://l
 | 方法 | 路径 | 说明 | 认证 |
 |------|------|------|------|
 | GET | `/api/profile` | 获取当前用户画像 | 是 |
-| PUT | `/api/profile` | 更新画像（部分字段） | 是 |
+| PUT | `/api/profile` | 更新画像 | 是 |
 
-### 岗位搜索
+### 岗位搜索（5平台聚合）
 
 | 方法 | 路径 | 说明 | 认证 |
 |------|------|------|------|
 | POST | `/api/jobs/search` | 搜索岗位（keyword/city/platform） | 是 |
-| GET | `/api/jobs/` | 列出已保存的岗位 | 是 |
+| GET | `/api/jobs/` | 列出已保存岗位 | 是 |
 | GET | `/api/jobs/{job_id}` | 获取岗位详情 | 是 |
-| GET | `/api/jobs/{job_id}/analyze` | JD智能分析（10维度评分） | 是 |
+| GET | `/api/jobs/{job_id}/analyze` | JD智能分析 | 是 |
+| POST | `/api/jobs/{job_id}/favorite` | 收藏/取消收藏 | 是 |
+| GET | `/api/jobs/favorites` | 收藏列表 | 是 |
+| POST | `/api/jobs/save-from-analysis` | 从分析结果保存岗位 | 是 |
+| POST | `/api/jobs/direct-analyze` | JD直推分析（粘贴JD文本） | 是 |
+| GET | `/api/jobs/international` | 国际岗位搜索（Himalayas/Remotive） | 是 |
+| GET | `/api/jobs/heatmap` | 投递热力图数据 | 是 |
+| GET | `/api/jobs/weekly-report` | 周报数据 | 是 |
+| GET | `/api/jobs/data-sources` | 数据源统计 | 是 |
+
+### 平台授权
+
+| 方法 | 路径 | 说明 | 认证 |
+|------|------|------|------|
+| GET | `/api/platform-auth/status` | 获取各平台授权状态 | 是 |
+| POST | `/api/platform-auth/connect` | 连接平台（BOSS/猎聘/51job） | 是 |
+| POST | `/api/platform-auth/disconnect` | 断开平台连接 | 是 |
 
 ### 简历管理
 
 | 方法 | 路径 | 说明 | 认证 |
 |------|------|------|------|
-| POST | `/api/resumes/upload` | 上传简历（multipart .md 文件） | 是 |
+| POST | `/api/resumes/upload` | 上传简历（支持PDF/Word/Markdown） | 是 |
 | GET | `/api/resumes/` | 列出所有简历版本 | 是 |
-| POST | `/api/resumes/{resume_id}/optimize` | AI简历优化（需传 job_id） | 是 |
+| POST | `/api/resumes/{resume_id}/optimize` | AI简历优化（6阶段Pipeline） | 是 |
 
 ### 投递追踪
 
 | 方法 | 路径 | 说明 | 认证 |
 |------|------|------|------|
-| GET | `/api/applications` | 列出投递记录（支持status筛选） | 是 |
+| GET | `/api/applications` | 列出投递记录 | 是 |
 | POST | `/api/applications` | 创建投递记录 | 是 |
 | PUT | `/api/applications/{app_id}` | 更新投递状态/备注 | 是 |
 | DELETE | `/api/applications/{app_id}` | 删除投递记录 | 是 |
@@ -217,137 +265,138 @@ API 运行在 `http://localhost:8000`，自动生成 Swagger 文档在 `http://l
 
 | 方法 | 路径 | 说明 | 认证 |
 |------|------|------|------|
-| POST | `/api/interviews/generate` | 生成面试方案（传 application_id） | 是 |
-| GET | `/api/interviews/` | 列出所有面试准备记录 | 是 |
+| POST | `/api/interviews/generate` | 生成面试方案 | 是 |
+| GET | `/api/interviews/` | 列出面试准备记录 | 是 |
+| POST | `/api/interviews/practice/start` | 开始模拟面试 | 是 |
+| POST | `/api/interviews/practice/answer` | 提交回答 | 是 |
+| POST | `/api/interviews/practice/end` | 结束模拟面试 | 是 |
 
-### 用户反馈
+### 职业测评与转型
 
 | 方法 | 路径 | 说明 | 认证 |
 |------|------|------|------|
-| POST | `/api/feedback` | 提交反馈（type + content） | 是 |
-| GET | `/api/feedback` | 列出用户反馈 | 是 |
+| POST | `/api/career/assessment/submit` | 提交测评结果 | 是 |
+| GET | `/api/career/assessment/result` | 获取测评结果 | 是 |
+| POST | `/api/career/transition/analyze` | 转型路径分析 | 是 |
+| GET | `/api/career/transition/cases` | 转型案例库 | 是 |
+
+### 经历资产与优势
+
+| 方法 | 路径 | 说明 | 认证 |
+|------|------|------|------|
+| GET | `/api/experiences` | 列出经历资产 | 是 |
+| POST | `/api/experiences` | 创建经历资产 | 是 |
+| PUT | `/api/experiences/{id}` | 更新经历资产 | 是 |
+| DELETE | `/api/experiences/{id}` | 删除经历资产 | 是 |
+| GET | `/api/strengths` | 列出优势分析 | 是 |
+| POST | `/api/strengths` | 创建优势记录 | 是 |
 
 ### 系统
 
 | 方法 | 路径 | 说明 | 认证 |
 |------|------|------|------|
 | GET | `/api/health` | 健康检查 | 否 |
+| GET | `/health` | 根路径健康检查 | 否 |
 
 ---
 
 ## 五、数据模型
 
-### users（用户表）
+共 14 张表，核心表如下：
 
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| id | Integer | 主键，自增 |
-| email | String | 邮箱，唯一索引 |
-| password_hash | String | bcrypt 哈希密码 |
-| created_at | DateTime | 创建时间 |
+### users / profiles / jobs / applications / resumes / interview_preps
 
-### profiles（个人画像表）
+详见 `models.py`，与用户求职流程直接相关。
 
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| id | Integer | 主键 |
-| user_id | Integer | 外键 → users.id，一对一 |
-| name | String | 姓名 |
-| phone | String | 手机号 |
-| city | String | 城市 |
-| salary_min | Integer | 最低薪资（K） |
-| salary_max | Integer | 最高薪资（K） |
-| deal_breakers | JSON | 不能接受的条件列表 |
-| preferences | JSON | 偏好设置字典 |
-
-### jobs（岗位表）
-
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| id | Integer | 主键 |
-| user_id | Integer | 外键 → users.id |
-| title | String | 岗位名称 |
-| company | String | 公司名称 |
-| salary | String | 薪资范围（如"25-40K"） |
-| city | String | 城市 |
-| platform | String | 招聘平台 |
-| jd_text | Text | 岗位描述全文 |
-| match_score | Float | 匹配评分 |
-| rating | Integer | 评分等级 |
-| status | String | 状态（new/applied/interview/offer/rejected/saved） |
-| jd_url | String | 岗位链接 |
-
-### applications（投递表）
+### job_favorites（岗位收藏表）
 
 | 字段 | 类型 | 说明 |
 |------|------|------|
 | id | Integer | 主键 |
 | user_id | Integer | 外键 → users.id |
 | job_id | Integer | 外键 → jobs.id |
-| status | String | 投递状态（12种状态流转） |
-| applied_at | DateTime | 投递时间 |
-| notes | Text | 备注 |
+| created_at | DateTime | 收藏时间 |
 
-### resumes（简历表）
+### job_cache（岗位缓存表）
 
 | 字段 | 类型 | 说明 |
 |------|------|------|
 | id | Integer | 主键 |
-| user_id | Integer | 外键 → users.id |
-| content | Text | 简历内容（Markdown） |
-| version | Integer | 版本号（自增） |
-| created_at | DateTime | 创建时间 |
+| source | String | 数据源（himalayas/remotive等） |
+| source_id | String | 源平台唯一ID |
+| expires_at | DateTime | 过期时间 |
 
-### interview_preps（面试准备表）
-
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| id | Integer | 主键 |
-| user_id | Integer | 外键 → users.id |
-| job_id | Integer | 外键 → jobs.id |
-| content | JSON | 面试方案内容 |
-| created_at | DateTime | 创建时间 |
-
-### feedbacks（反馈表）
+### experiences（经历资产表）
 
 | 字段 | 类型 | 说明 |
 |------|------|------|
 | id | Integer | 主键 |
-| user_id | Integer | 外键 → users.id |
-| type | String | 反馈类型 |
-| content | Text | 反馈内容 |
-| created_at | DateTime | 创建时间 |
+| user_id | Integer | 外键 |
+| type | String | 类型（project/internship/course等） |
+| title | String | 标题 |
+| background/task/action/result | Text | STAR结构 |
+| evidence | Text | 证据/成果 |
+
+### strengths（优势分析表）
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| id | Integer | 主键 |
+| user_id | Integer | 外键 |
+| name | String | 优势名称 |
+| classification | String | 分类（fact/assumption/inference） |
+| confidence | String | 信心度（high/medium/low） |
+
+### interview_practice_sessions（模拟面试表）
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| id | Integer | 主键 |
+| user_id | Integer | 外键 |
+| target_role | String | 目标岗位 |
+| status | String | active/ended |
+| transcript | JSON | 对话记录 |
+
+### platform_auths（平台授权表）
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| id | Integer | 主键 |
+| user_id | Integer | 外键 |
+| platform | String | boss/liepin/51job |
+| cookies | Text | Cookie JSON |
+| token | Text | 猎聘MCP Token |
+| status | String | active/expired/disconnected |
 
 ---
 
-## 六、部署流程
+## 六、数据获取架构
 
-### Pinme 一键部署
+### 5平台搜索流程
 
-```bash
-chmod +x deploy.sh
-./deploy.sh
+```
+用户搜索请求
+    ├── 猎聘 MCP API（用户Token授权）
+    ├── BOSS直聘（Playwright + 用户Cookie）
+    ├── 前程无忧（Playwright + 用户Cookie）
+    ├── Himalayas Jobs API（公开API）
+    └── Remotive API（公开API）
+         ↓
+    结果聚合 + 去重 + 评分
+         ↓
+    返回前端展示
 ```
 
-### 手动分别部署
+### 合规边界
 
-```bash
-# 前端部署（Pinme Pages）
-cd frontend
-npm run build
-npx pinme save
-
-# 后端部署（Pinme API）
-cd ../backend
-npx pinme save
-```
-
-### 生产环境配置
-
-1. 修改后端 `JWT_SECRET_KEY` 为强随机字符串
-2. 配置 `AI_API_KEY`（如需真实AI分析）
-3. 在 `backend/main.py` 中更新 `allow_origins` 为生产域名
-4. 确认 Pinme 平台的环境变量已配置
+| 等级 | 数据源 | 方式 | 状态 |
+|------|--------|------|------|
+| 合规 | 猎聘MCP API | 用户Token授权 | 已集成 |
+| 合规 | Himalayas Jobs API | 公开API | 已集成 |
+| 合规 | Remotive API | 公开API | 已集成 |
+| 合规 | 用户手动粘贴JD | 前端输入 | 已实现 |
+| 灰色 | Playwright(BOSS直聘) | 用户登录态 | 已实现 |
+| 灰色 | Playwright(前程无忧) | 用户登录态 | 已实现 |
 
 ---
 
@@ -355,48 +404,23 @@ npx pinme save
 
 ### 添加新页面（前端）
 
-1. 在 `frontend/src/pages/` 下新建页面组件，如 `NewFeature.tsx`
-2. 在 `App.tsx` 中添加路由：
-   ```tsx
-   <Route path="/new-feature" element={<ProtectedRoute><NewFeature /></ProtectedRoute>} />
-   ```
-3. 在 `Navbar.tsx` 中添加导航链接
+1. 在 `frontend/src/pages/` 下新建页面组件
+2. 在 `App.tsx` 中添加路由
+3. 在 `Layout.tsx` 侧边栏中添加导航链接
 4. 如需新类型，在 `types/index.ts` 中添加接口定义
 
 ### 添加新API端点（后端）
 
-1. 在 `backend/routers/` 下新建路由文件（或添加到已有文件）
+1. 在 `backend/routers/` 下新建路由文件
 2. 在 `backend/models.py` 中添加新数据模型（如需新表）
-3. 在 `backend/main.py` 中注册路由：
-   ```python
-   from routers import new_feature
-   app.include_router(new_feature.router, prefix="/api")
-   ```
-4. 重启后端服务使改动生效
+3. 在 `backend/main.py` 中注册路由
+4. 重启后端服务
 
-### 接入真实AI服务
+### 添加新数据源
 
-当前JD分析和简历优化使用内置模拟数据。接入真实AI的步骤：
-
-1. 在环境变量中配置 `AI_API_KEY`
-2. 在 jobs.py 的 `analyze_job` 和 resumes.py 的 `optimize_resume` 中，将模拟逻辑替换为 AI API 调用
-3. 使用 `httpx`（已安装）发送请求到 OpenAI 兼容接口
-4. 解析 AI 返回的 JSON 结构化内容
-
-### 接入真实岗位数据
-
-当前搜索使用内置模拟数据 + autocli 子进程。接入真实API的步骤：
-
-1. 在 `jobs.py` 的 `try_autocli_search` 基础上，添加真实招聘平台的 API 调用
-2. 实现统一的搜索接口适配层，支持多平台聚合
-3. 添加搜索结果缓存，减少 API 调用次数
-
-### 添加付费系统
-
-1. 在 `models.py` 添加订阅表（subscriptions）
-2. 创建新的支付路由 `routers/payments.py`
-3. 在认证中间件中添加权限检查（免费版/Pro版功能限制）
-4. 前端根据用户订阅状态显示/隐藏功能入口
+1. 在 `job_sources.py` 或新建文件中实现数据获取逻辑
+2. 在 `jobs.py` 的 `search_jobs` 中添加调用
+3. 确保返回统一的数据格式
 
 ---
 
@@ -409,8 +433,6 @@ npx pinme save
 4. 后端 get_current_user 依赖解析 Token，获取当前用户
 5. 401 响应时，Axios 拦截器自动清除 Token 并跳转登录页
 ```
-
-JWT Token 使用 `python-jose` 库生成，密钥配置在 `JWT_SECRET_KEY` 环境变量中。
 
 ---
 

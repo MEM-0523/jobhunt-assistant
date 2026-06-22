@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Upload,
   FileText,
@@ -9,10 +10,19 @@ import {
   Loader2,
   ChevronDown,
   CheckCircle2,
+  Award,
   } from 'lucide-react';
 import client from '../api/client';
-import type { Resume, Job } from '../types';
+import type { Resume, Job, ResumeSuggestion, ResumeLabel } from '../types';
 import { transitionCases } from '../data/transitionCases';
+
+const SUGGESTION_LABEL_CONFIG: Record<ResumeLabel, { text: string; className: string }> = {
+  use_as_is: { text: '可用', className: 'bg-green-100 text-green-700' },
+  rewrite: { text: '需改写', className: 'bg-blue-100 text-blue-700' },
+  needs_proof: { text: '缺证据', className: 'bg-yellow-100 text-yellow-700' },
+  remove: { text: '建议删除', className: 'bg-red-100 text-red-700' },
+  ask_user: { text: '需追问', className: 'bg-gray-100 text-gray-700' },
+};
 
 function renderMarkdown(content: string): string {
   const lines = content.split('\n');
@@ -107,6 +117,7 @@ function escapeHtml(text: string): string {
 }
 
 export default function ResumePage() {
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<'my' | 'optimize'>('my');
   const [resumes, setResumes] = useState<Resume[]>([]);
   const [jobs, setJobs] = useState<Job[]>([]);
@@ -120,6 +131,7 @@ export default function ResumePage() {
     overall_score: number;
     final_content: string;
     summary: string;
+    suggestions?: ResumeSuggestion[];
   } | null>(null);
   const [pipelineRunning, setPipelineRunning] = useState(false);
   const [activeStage, setActiveStage] = useState(0);
@@ -379,6 +391,15 @@ export default function ResumePage() {
             )}
           </div>
 
+          {/* Bridge to Experiences */}
+          <button
+            onClick={() => navigate('/experience-assets')}
+            className="flex items-center justify-center gap-2 w-full py-2 mt-2 bg-amber-50 text-amber-700 rounded-md text-sm font-medium hover:bg-amber-100 border border-amber-200 transition-colors"
+          >
+            <Award size={16} />
+            从经历资产导入
+          </button>
+
           {/* Upload Error */}
           {uploadError && (
             <div className="flex items-center gap-2 bg-red-50 text-red-700 px-4 py-3 rounded-md">
@@ -626,6 +647,50 @@ export default function ResumePage() {
                   </div>
                 </details>
               ))}
+            </div>
+          )}
+
+          {/* 优化建议明细（带标签系统） */}
+          {pipelineResult && pipelineResult.suggestions && pipelineResult.suggestions.length > 0 && (
+            <div className="space-y-3">
+              <h3 className="text-lg font-semibold text-gray-900 px-1">优化建议明细</h3>
+              {pipelineResult.suggestions.map((suggestion, idx) => {
+                const labelKey = (suggestion.label as ResumeLabel) || 'rewrite';
+                const labelConfig = SUGGESTION_LABEL_CONFIG[labelKey] || SUGGESTION_LABEL_CONFIG.rewrite;
+                const isNeedsProof = labelKey === 'needs_proof';
+                return (
+                  <div key={idx} className="bg-white rounded-lg border border-gray-200 p-4 space-y-2">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${labelConfig.className}`}>
+                        {labelConfig.text}
+                      </span>
+                      {suggestion.section && (
+                        <span className="text-xs text-gray-500">板块：{suggestion.section}</span>
+                      )}
+                    </div>
+                    <div className="space-y-1 text-sm">
+                      <div>
+                        <span className="text-gray-500">原文：</span>
+                        <span className="text-gray-700">{suggestion.original}</span>
+                      </div>
+                      <div>
+                        <span className="text-gray-500">建议：</span>
+                        <span className="text-gray-900 font-medium">{suggestion.suggestion}</span>
+                      </div>
+                    </div>
+                    {suggestion.reason && !isNeedsProof && (
+                      <p className="text-xs text-gray-500 bg-gray-50 px-3 py-2 rounded">
+                        {suggestion.reason}
+                      </p>
+                    )}
+                    {isNeedsProof && suggestion.reason && (
+                      <div className="bg-yellow-50 border border-yellow-200 rounded px-3 py-2 text-xs text-yellow-800">
+                        ⚠️ 缺少证据：{suggestion.reason}。建议补充相关项目经历或修改表述。
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           )}
 

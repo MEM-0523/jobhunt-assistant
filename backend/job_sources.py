@@ -125,15 +125,23 @@ async def fetch_himalayas_jobs(keyword: str, country: str = "") -> list[dict]:
     jobs_raw = data.get("jobs", [])
     normalized = []
     for j in jobs_raw:
-        job_id = str(j.get("id", ""))
+        job_id = j.get("guid", "") or j.get("id", "") or ""
         title = j.get("title", "") or j.get("position_name", "")
-        company = j.get("company", "")
+        company = j.get("companyName", "") or j.get("company", "")
         if isinstance(company, dict):
             company = company.get("name", "")
-        description = j.get("description", "") or j.get("responsibilities", "")
-        url_val = j.get("url", "") or j.get("apply_url", "")
+        description = j.get("description", "") or j.get("excerpt", "")
+        # Himalayas uses 'guid' and 'applicationLink' for job URLs
+        url_val = j.get("applicationLink", "") or j.get("guid", "") or j.get("url", "") or j.get("apply_url", "")
         if url_val and not url_val.startswith("http"):
             url_val = f"https://himalayas.app{url_val}"
+
+        # Location: Himalayas uses 'locationRestrictions' (list) or 'location' (string)
+        location = j.get("location", "")
+        if not location:
+            loc_restrictions = j.get("locationRestrictions", [])
+            if isinstance(loc_restrictions, list) and loc_restrictions:
+                location = loc_restrictions[0] if isinstance(loc_restrictions[0], str) else str(loc_restrictions[0])
 
         categories = j.get("categories", [])
         if isinstance(categories, list):
@@ -146,7 +154,7 @@ async def fetch_himalayas_jobs(keyword: str, country: str = "") -> list[dict]:
             "title": title,
             "company": company,
             "salary": j.get("salary", "") or "面议",
-            "city": j.get("location", "") or "",
+            "city": location or "",
             "country": j.get("country", ""),
             "platform": "Himalayas",
             "jd_text": description,

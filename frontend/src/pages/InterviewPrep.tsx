@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Target, MessageSquare, BookOpen, HelpCircle, ClipboardCheck, ChevronDown,
   ChevronUp, Loader2, AlertCircle, Check, ClipboardList, Star, Save, Calendar,
   DollarSign, AlertTriangle, Shield, Building2, TrendingUp, Zap, Clock, User,
-  Briefcase, Link2, CheckSquare,
+  Briefcase, Link2, CheckSquare, Mic,
 } from 'lucide-react';
 import client from '../api/client';
 import type { Application, InterviewPrepData, QAPair, Story, QuestionToAsk, InterviewReview } from '../types';
@@ -33,6 +34,7 @@ const CATEGORY_COLORS: Record<string, string> = {
 };
 
 export default function InterviewPrep() {
+  const navigate = useNavigate();
   const [applications, setApplications] = useState<Application[]>([]);
   const [selectedAppId, setSelectedAppId] = useState<number | null>(null);
   const [loadingApps, setLoadingApps] = useState(true);
@@ -283,6 +285,13 @@ export default function InterviewPrep() {
             ) : (
               '生成面试准备'
             )}
+          </button>
+          <button
+            onClick={() => navigate('/interview-practice')}
+            className="flex items-center gap-2 px-5 py-2 bg-purple-50 text-purple-700 rounded-md hover:bg-purple-100 border border-purple-200 transition-colors text-sm font-medium whitespace-nowrap"
+          >
+            <Mic size={16} />
+            开始模拟训练
           </button>
         </div>
       </div>

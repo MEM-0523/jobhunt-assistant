@@ -14,6 +14,10 @@ export interface Profile {
   salary_max: number;
   deal_breakers: string[];
   preferences: Record<string, unknown>;
+  risk_tolerance: string;
+  learning_pace: string;
+  target_timeline: string;
+  target_industries: string[];
   created_at: string;
   updated_at: string;
 }
@@ -74,6 +78,7 @@ export interface Application {
   created_at: string;
   updated_at: string;
   job?: Job;
+  is_demo?: boolean;
 }
 
 export interface ApplicationStats {
@@ -164,6 +169,8 @@ export interface KeywordSuggestion {
   original: string;
   replacement: string;
   reason: string;
+  label?: string;
+  label_reason?: string;
 }
 
 export interface ResumeOptimization {
@@ -171,6 +178,7 @@ export interface ResumeOptimization {
   keyword_suggestions: KeywordSuggestion[];
   improvement_suggestions: string[];
   optimized_content: string;
+  suggestions?: ResumeSuggestion[];
 }
 
 export interface AuthResponse {
@@ -192,6 +200,16 @@ export interface JobAnalysis {
   dimensions: AnalysisDimension[];
   summary: string;
   suggestions: string[];
+  // 5维度评分（新）
+  experience_fit?: number;
+  hard_requirements?: number;
+  interest_direction?: number;
+  practical_constraints?: number;
+  risk_screening?: number;
+  total_score?: number;
+  grade?: string;
+  red_flags?: string[];
+  reasoning?: string;
 }
 
 export interface RecentActivity {
@@ -265,4 +283,100 @@ export interface GapAnalysis {
   priority1_must_fill: GapItem[];
   priority2_should_fill: GapItem[];
   priority3_nice_to_have: GapItem[];
+}
+
+export interface Notification {
+  id: number;
+  user_id: number;
+  type: 'info' | 'success' | 'warning' | 'reminder';
+  title: string;
+  message: string;
+  is_read: boolean;
+  link: string;
+  created_at: string;
+}
+
+export interface NotificationListResponse {
+  items: Notification[];
+  total: number;
+  unread_count: number;
+  page: number;
+  page_size: number;
+}
+
+// 经历资产库
+export interface Experience {
+  id: number;
+  user_id: number;
+  type: 'project' | 'internship' | 'course' | 'club' | 'self_study' | 'part_time';
+  title: string;
+  background: string;
+  task: string;
+  action: string;
+  method_tool: string;
+  result: string;
+  evidence: string;
+  created_at: string;
+  updated_at: string;
+}
+
+// 优势证据链
+export interface Strength {
+  id: number;
+  user_id: number;
+  name: string;
+  classification: 'fact' | 'assumption' | 'inference';
+  evidence: string;
+  behavior: string;
+  ability: string;
+  job_signal: string;
+  confidence: 'high' | 'medium' | 'low';
+  missing_proof: string;
+  next_action: string;
+  created_at: string;
+}
+
+// 面试练习会话
+export interface InterviewPracticeSession {
+  id: number;
+  user_id: number;
+  target_role: string;
+  job_description: string;
+  transcript: Array<{
+    role: 'ai' | 'user';
+    content: string;
+    feedback?: {
+      what_worked: string;
+      what_unclear: string;
+      what_not_to_say: string;
+      star_improved: string;
+      practice_drill: string;
+    };
+  }>;
+  follow_up_count: number;
+  created_at: string;
+}
+
+// 5维度评分
+export interface FiveDimensionScore {
+  experience_fit: number;      // 0-40
+  hard_requirements: number;   // 0-20
+  interest_direction: number;  // 0-15
+  practical_constraints: number; // 0-15
+  risk_screening: number;      // 0-10
+  total_score: number;         // 0-100
+  grade: 'A' | 'B' | 'C' | 'D';
+  red_flags: string[];
+  reasoning: string;
+}
+
+// 简历优化建议标签
+export type ResumeLabel = 'use_as_is' | 'rewrite' | 'needs_proof' | 'remove' | 'ask_user';
+
+export interface ResumeSuggestion {
+  label: ResumeLabel;
+  reason: string;
+  original: string;
+  suggestion: string;
+  section?: string;
 }

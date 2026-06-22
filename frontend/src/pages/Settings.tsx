@@ -9,6 +9,7 @@ const STEPS = [
   { label: '硬性要求', key: 'constraints' },
   { label: '软偏好', key: 'preferences' },
   { label: '能力盘点', key: 'skills' },
+  { label: '转型策略', key: 'transition' },
 ];
 
 interface SkillItem {
@@ -83,6 +84,11 @@ export default function Settings() {
   const [remoteOk, setRemoteOk] = useState(false);
   const [companyCulture, setCompanyCulture] = useState<string[]>(['注重工作生活平衡']);
   const [skills, setSkills] = useState<SkillItem[]>([{ name: '', level: '熟练' }]);
+  // Transition strategy
+  const [riskTolerance, setRiskTolerance] = useState('medium');
+  const [learningPace, setLearningPace] = useState('part-time');
+  const [targetTimeline, setTargetTimeline] = useState('6months');
+  const [targetIndustries, setTargetIndustries] = useState<string[]>([]);
 
   // Load profile on mount
   useEffect(() => {
@@ -110,6 +116,10 @@ export default function Settings() {
         if (typeof prefs.remote_ok === 'boolean') setRemoteOk(prefs.remote_ok);
         if (Array.isArray(prefs.company_culture)) setCompanyCulture(prefs.company_culture);
         if (Array.isArray(prefs.skills)) setSkills(prefs.skills as SkillItem[]);
+        if (data.risk_tolerance) setRiskTolerance(data.risk_tolerance);
+        if (data.learning_pace) setLearningPace(data.learning_pace);
+        if (data.target_timeline) setTargetTimeline(data.target_timeline);
+        if (data.target_industries?.length) setTargetIndustries(data.target_industries);
       })
       .catch(() => { /* profile not found, use defaults */ })
       .finally(() => setLoading(false));
@@ -134,6 +144,10 @@ export default function Settings() {
       salary_max: salaryMax,
       deal_breakers: dealBreakers.filter((v) => v !== '其他'),
       preferences,
+      risk_tolerance: riskTolerance,
+      learning_pace: learningPace,
+      target_timeline: targetTimeline,
+      target_industries: targetIndustries,
     };
   };
 
@@ -251,6 +265,12 @@ export default function Settings() {
 
   const toggleCulture = (value: string) => {
     setCompanyCulture((prev) =>
+      prev.includes(value) ? prev.filter((v) => v !== value) : [...prev, value]
+    );
+  };
+
+  const toggleTargetIndustry = (value: string) => {
+    setTargetIndustries((prev) =>
       prev.includes(value) ? prev.filter((v) => v !== value) : [...prev, value]
     );
   };
@@ -719,6 +739,114 @@ export default function Settings() {
               <p>· 精通（5-10年专业经验）</p>
               <p>· 熟练（2-5年使用经验）</p>
               <p>· 了解（1年以内或基础了解）</p>
+            </div>
+          </div>
+        )}
+
+        {/* Step 4: 转型策略 */}
+        {step === 4 && (
+          <div className="space-y-5">
+            <h2 className="text-lg font-semibold text-gray-900">转型策略</h2>
+            <p className="text-sm text-gray-500 -mt-3">设定你的转型偏好，系统将据此个性化推荐路径</p>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">风险偏好</label>
+              <div className="grid grid-cols-3 gap-2">
+                {[
+                  { value: 'low', label: '稳健型', desc: '先补技能再求职' },
+                  { value: 'medium', label: '平衡型', desc: '学习求职并行' },
+                  { value: 'high', label: '激进型', desc: '以战代练' },
+                ].map((opt) => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => setRiskTolerance(opt.value)}
+                    className={cn(
+                      'p-3 rounded-lg border text-center transition-colors',
+                      riskTolerance === opt.value
+                        ? 'border-indigo-500 bg-indigo-50 text-indigo-700'
+                        : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
+                    )}
+                  >
+                    <div className="text-sm font-medium">{opt.label}</div>
+                    <div className="text-xs text-gray-400 mt-0.5">{opt.desc}</div>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">学习节奏</label>
+              <div className="grid grid-cols-3 gap-2">
+                {[
+                  { value: 'full-time', label: '全职学习', desc: '每天6-8小时' },
+                  { value: 'part-time', label: '在职学习', desc: '每天2-3小时' },
+                  { value: 'intensive', label: '集中冲刺', desc: '每天10+小时' },
+                ].map((opt) => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => setLearningPace(opt.value)}
+                    className={cn(
+                      'p-3 rounded-lg border text-center transition-colors',
+                      learningPace === opt.value
+                        ? 'border-indigo-500 bg-indigo-50 text-indigo-700'
+                        : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
+                    )}
+                  >
+                    <div className="text-sm font-medium">{opt.label}</div>
+                    <div className="text-xs text-gray-400 mt-0.5">{opt.desc}</div>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">目标时间线</label>
+              <div className="grid grid-cols-3 gap-2">
+                {[
+                  { value: '3months', label: '3个月', desc: '快速切入' },
+                  { value: '6months', label: '6个月', desc: '稳步过渡' },
+                  { value: '12months', label: '12个月', desc: '深度转型' },
+                ].map((opt) => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => setTargetTimeline(opt.value)}
+                    className={cn(
+                      'p-3 rounded-lg border text-center transition-colors',
+                      targetTimeline === opt.value
+                        ? 'border-indigo-500 bg-indigo-50 text-indigo-700'
+                        : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
+                    )}
+                  >
+                    <div className="text-sm font-medium">{opt.label}</div>
+                    <div className="text-xs text-gray-400 mt-0.5">{opt.desc}</div>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">感兴趣的目标行业</label>
+              <div className="flex flex-wrap gap-2">
+                {['AI/互联网', '建筑科技', '智慧城市', 'SaaS', '云计算', '金融科技', '在线教育', '企业服务', '电商', '其他'].map((ind) => (
+                  <button
+                    key={ind}
+                    type="button"
+                    onClick={() => toggleTargetIndustry(ind)}
+                    className={cn(
+                      'px-3 py-1.5 rounded-full text-sm border transition-colors',
+                      targetIndustries.includes(ind)
+                        ? 'bg-indigo-50 border-indigo-300 text-indigo-700'
+                        : 'bg-white border-gray-200 text-gray-600 hover:border-gray-300'
+                    )}
+                  >
+                    {targetIndustries.includes(ind) && <Check className="w-3 h-3 inline mr-1" />}
+                    {ind}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
         )}

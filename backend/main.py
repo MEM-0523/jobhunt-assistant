@@ -1,9 +1,12 @@
 import os
+from dotenv import load_dotenv
+load_dotenv()  # Load .env before importing routers that use PINME_API_KEY
+
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from database import engine, Base
-from routers import auth, profile, jobs, resumes, applications, interviews, feedback, career
+from routers import auth, profile, jobs, jobs_search, jobs_analysis, resumes, applications, interviews, feedback, career, seed, notifications, experiences, strengths, platform_auth
 
 DEFAULT_CORS_ORIGINS = [
     "http://localhost:5173",
@@ -54,11 +57,18 @@ app.add_middleware(
 app.include_router(auth.router, prefix="/api")
 app.include_router(profile.router, prefix="/api")
 app.include_router(jobs.router, prefix="/api")
+app.include_router(jobs_search.router, prefix="/api")
+app.include_router(jobs_analysis.router, prefix="/api")
 app.include_router(resumes.router, prefix="/api")
 app.include_router(applications.router, prefix="/api")
 app.include_router(career.router, prefix="/api")
 app.include_router(interviews.router, prefix="/api")
 app.include_router(feedback.router, prefix="/api")
+app.include_router(seed.router, prefix="/api")
+app.include_router(notifications.router, prefix="/api")
+app.include_router(experiences.router, prefix="/api")
+app.include_router(strengths.router, prefix="/api")
+app.include_router(platform_auth.router, prefix="/api/platform-auth", tags=["platform-auth"])
 
 
 @app.get("/api/health")
