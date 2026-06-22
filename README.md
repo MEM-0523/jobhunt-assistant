@@ -1,3 +1,14 @@
+---
+title: AI求职助手 - 转型导航
+emoji: 🧭
+colorFrom: purple
+colorTo: blue
+sdk: docker
+app_port: 7860
+pinned: false
+license: mit
+---
+
 # 求职助手Web
 
 基于 React + FastAPI 的全栈求职管理平台，覆盖岗位搜索、能力评估、简历优化、面试准备全链路。
