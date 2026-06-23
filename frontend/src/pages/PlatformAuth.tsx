@@ -75,7 +75,6 @@ function formatExpiry(expiresAt: string | null): string | null {
 export default function PlatformAuth() {
   const [statuses, setStatuses] = useState<PlatformStatus[]>([]);
   const [loading, setLoading] = useState(true);
-  const [loginLoading, setLoginLoading] = useState<string | null>(null);
   const [liepinToken, setLiepinToken] = useState('');
   const [liepinSaving, setLiepinSaving] = useState(false);
   const [liepinValidating, setLiepinValidating] = useState(false);
@@ -124,36 +123,6 @@ export default function PlatformAuth() {
 
   const getStatus = (platform: string): PlatformStatus | undefined =>
     statuses.find((s) => s.platform === platform);
-
-  const handleLogin = async (platform: string) => {
-    setLoginLoading(platform);
-    setError('');
-    setSuccess('');
-    try {
-      await client.post(`/platform-auth/${platform}/login`);
-      setSuccess(`请在弹出的浏览器窗口中完成${getPlatformName(platform)}登录`);
-      // 轮询状态
-      pollRef.current = setInterval(async () => {
-        const latest = await loadStatus();
-        const s = latest.find((x) => x.platform === platform);
-        if (s?.status === 'active') {
-          if (pollRef.current) clearInterval(pollRef.current);
-          if (timeoutRef.current) clearTimeout(timeoutRef.current);
-          setLoginLoading(null);
-          setSuccess(`${getPlatformName(platform)} 登录成功`);
-        }
-      }, 3000);
-      // 120秒超时
-      timeoutRef.current = setTimeout(() => {
-        if (pollRef.current) clearInterval(pollRef.current);
-        setLoginLoading(null);
-        setError(`${getPlatformName(platform)} 登录超时，请重试`);
-      }, 120000);
-    } catch (e) {
-      setError(`登录失败: ${getErrorMessage(e, '未知错误')}`);
-      setLoginLoading(null);
-    }
-  };
 
   const handleDisconnect = async (platform: string) => {
     setError('');
