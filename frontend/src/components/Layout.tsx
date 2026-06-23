@@ -25,19 +25,19 @@ import client from '../api/client';
 
 const sidebarItems = [
   { to: '/dashboard', icon: LayoutDashboard, label: '首页' },
-  { to: '/search', icon: Search, label: '搜索岗位' },
+  { to: '/settings', icon: Settings, label: '设置' },
   { to: '/platform-auth', icon: Link2, label: '平台连接' },
+  { to: '/search', icon: Search, label: '搜索岗位' },
   { to: '/favorites', icon: Heart, label: '收藏岗位' },
   { to: '/direct-analyze', icon: FileSearch, label: 'JD直推' },
-  { to: '/career-transition', icon: Zap, label: '能力迁移' },
   { to: '/assessment', icon: ClipboardList, label: '职业测评' },
+  { to: '/career-transition', icon: Zap, label: '能力迁移' },
+  { to: '/experience-assets', icon: Award, label: '经历资产' },
+  { to: '/strength-analysis', icon: Sparkles, label: '优势分析' },
   { to: '/resume', icon: FileText, label: '我的简历' },
   { to: '/applications', icon: ListChecks, label: '投递追踪' },
   { to: '/interview-prep', icon: Target, label: '面试准备' },
-  { to: '/experience-assets', icon: Award, label: '经历资产' },
-  { to: '/strength-analysis', icon: Sparkles, label: '优势分析' },
   { to: '/interview-practice', icon: Mic, label: '面试训练' },
-  { to: '/settings', icon: Settings, label: '设置' },
 ];
 
 export default function Layout() {
