@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import {
   Sparkles, Loader2, AlertCircle, Trash2, Award, ArrowDown,
-  CheckCircle2, AlertTriangle, Target, Zap,
+  CheckCircle2, AlertTriangle, Target, Zap, FileText,
 } from 'lucide-react';
 import client from '../api/client';
 import type { Strength } from '../types';
@@ -25,6 +25,10 @@ export default function StrengthAnalysis() {
   const [error, setError] = useState<string | null>(null);
   const [experienceCount, setExperienceCount] = useState<number>(0);
   const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [selectedStrengthIds, setSelectedStrengthIds] = useState<Set<number>>(new Set());
+  const [exportLoading, setExportLoading] = useState(false);
+  const [exportError, setExportError] = useState('');
 
   const loadStrengths = async () => {
     try {
@@ -84,18 +88,91 @@ export default function StrengthAnalysis() {
     }
   };
 
+  const toggleStrengthSelect = (id: number) => {
+    setSelectedStrengthIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const handleExportToResume = async () => {
+    if (selectedStrengthIds.size === 0) {
+      setExportError('请至少选择一条优势');
+      return;
+    }
+
+    const confidenceLabels: Record<string, string> = {
+      high: '高置信度',
+      medium: '中置信度',
+      low: '低置信度',
+    };
+
+    const selectedStrengths = strengths.filter(s => selectedStrengthIds.has(s.id));
+    const mdContent = selectedStrengths.map(s => {
+      const sections = [`## 优势：${s.name}`];
+      sections.push(`**置信度**：${confidenceLabels[s.confidence] || s.confidence}`);
+      if (s.evidence) sections.push(`**证据**：${s.evidence}`);
+      if (s.behavior) sections.push(`**行为表现**：${s.behavior}`);
+      if (s.ability) sections.push(`**核心能力**：${s.ability}`);
+      if (s.job_signal) sections.push(`**岗位信号**：${s.job_signal}`);
+      return sections.join('\n\n');
+    }).join('\n\n---\n\n');
+
+    const header = `# 优势分析摘要（从优势分析导入）\n\n> 生成时间：${new Date().toLocaleString('zh-CN')}\n\n---\n\n`;
+    const fullContent = header + mdContent;
+
+    try {
+      setExportLoading(true);
+      const blob = new Blob([fullContent], { type: 'text/markdown' });
+      const formData = new FormData();
+      formData.append('file', blob, `strengths_export_${Date.now()}.md`);
+      await client.post('/resumes/upload', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      setShowExportModal(false);
+      setSelectedStrengthIds(new Set());
+      setExportError('');
+      setError(null);
+    } catch (err: unknown) {
+      const message =
+        err && typeof err === 'object' && 'response' in err
+          ? (err as { response?: { data?: { detail?: string } } }).response?.data?.detail || '导出到简历失败，请重试'
+          : '导出到简历失败，请重试';
+      setExportError(message);
+    } finally {
+      setExportLoading(false);
+    }
+  };
+
   return (
     <div className="max-w-4xl mx-auto">
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold text-gray-900">优势分析</h1>
-        <button
-          onClick={handleGenerate}
-          disabled={generating || experienceCount === 0}
-          className="inline-flex items-center gap-1.5 px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors text-sm font-medium"
-        >
-          {generating ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}
-          {generating ? 'AI生成中...' : 'AI生成优势分析'}
-        </button>
+        <div className="flex gap-2">
+          {strengths.length > 0 && (
+            <button
+              onClick={() => {
+                setShowExportModal(true);
+                setSelectedStrengthIds(new Set());
+                setExportError('');
+              }}
+              className="inline-flex items-center gap-1.5 px-4 py-2 border border-indigo-200 text-indigo-600 rounded-md hover:bg-indigo-50 transition-colors text-sm font-medium"
+            >
+              <FileText size={16} />
+              应用到简历
+            </button>
+          )}
+          <button
+            onClick={handleGenerate}
+            disabled={generating || experienceCount === 0}
+            className="inline-flex items-center gap-1.5 px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors text-sm font-medium"
+          >
+            {generating ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}
+            {generating ? 'AI生成中...' : 'AI生成优势分析'}
+          </button>
+        </div>
       </div>
 
       {/* Error */}
@@ -236,6 +313,103 @@ export default function StrengthAnalysis() {
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* ========== 导出到简历 Modal ========== */}
+      {showExportModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[80vh] flex flex-col">
+            <div className="flex items-center justify-between p-5 border-b border-gray-200">
+              <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                <FileText size={20} className="text-indigo-600" />
+                导出优势到简历
+              </h3>
+              <button
+                onClick={() => setShowExportModal(false)}
+                className="text-gray-400 hover:text-gray-600 text-xl leading-none"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-5">
+              <p className="text-sm text-gray-500 mb-3">
+                勾选要导出的优势，将生成Markdown格式简历并保存为新版本
+              </p>
+              <div className="space-y-2">
+                {strengths.map(s => {
+                  const checked = selectedStrengthIds.has(s.id);
+                  return (
+                    <label
+                      key={s.id}
+                      className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
+                        checked ? 'border-indigo-300 bg-indigo-50' : 'border-gray-200 hover:bg-gray-50'
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={() => toggleStrengthSelect(s.id)}
+                        className="mt-1 w-4 h-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-gray-900 truncate">{s.name}</p>
+                        {s.ability && (
+                          <p className="text-xs text-gray-500 mt-0.5">
+                            能力：{s.ability.slice(0, 60)}{s.ability.length > 60 ? '...' : ''}
+                          </p>
+                        )}
+                        {s.job_signal && (
+                          <p className="text-xs text-gray-400 mt-0.5">
+                            岗位信号：{s.job_signal.slice(0, 60)}{s.job_signal.length > 60 ? '...' : ''}
+                          </p>
+                        )}
+                      </div>
+                    </label>
+                  );
+                })}
+              </div>
+
+              {exportError && (
+                <div className="mt-3 flex items-center gap-2 bg-red-50 text-red-700 px-3 py-2 rounded-md text-sm">
+                  <AlertCircle size={16} />
+                  <span>{exportError}</span>
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-center justify-between p-4 border-t border-gray-200">
+              <span className="text-sm text-gray-500">
+                已选 {selectedStrengthIds.size} 条
+              </span>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setShowExportModal(false)}
+                  className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-md transition-colors"
+                >
+                  取消
+                </button>
+                <button
+                  onClick={handleExportToResume}
+                  disabled={selectedStrengthIds.size === 0 || exportLoading}
+                  className="px-4 py-2 text-sm bg-indigo-600 text-white rounded-md hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5 transition-colors"
+                >
+                  {exportLoading ? (
+                    <>
+                      <Loader2 size={14} className="animate-spin" />
+                      导出中...
+                    </>
+                  ) : (
+                    <>
+                      <FileText size={14} />
+                      确认导出
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </div>
