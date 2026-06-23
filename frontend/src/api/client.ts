@@ -25,7 +25,9 @@ client.interceptors.response.use(
   (error) => {
     if (error.response?.status === 401) {
       localStorage.removeItem('token');
-      window.location.href = '/login';
+      if (!window.location.pathname.startsWith('/login') && !window.location.pathname.startsWith('/register')) {
+        window.location.href = '/login';
+      }
     }
     if (error.code === 'ERR_NETWORK' || error.code === 'ERR_CONNECTION_REFUSED') {
       console.error('无法连接后端服务，请确认后端已启动');

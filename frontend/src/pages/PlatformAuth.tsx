@@ -285,15 +285,45 @@ export default function PlatformAuth() {
               </a>
             </div>
             {guideOpen && (
-              <div className="mt-2 p-3 bg-gray-50 rounded-md text-xs text-gray-600 space-y-1.5">
+              <div className="mt-2 p-3 bg-gray-50 rounded-md text-xs text-gray-600 space-y-2">
                 <p className="font-medium text-gray-700">操作步骤：</p>
                 <p>1. 点击上方链接打开{getPlatformName(platform)}并登录</p>
-                <p>2. 按 <kbd className="px-1 py-0.5 bg-white border border-gray-300 rounded text-xs">F12</kbd> 打开开发者工具</p>
-                <p>3. 切换到 <span className="font-medium">Network</span>（网络）标签</p>
-                <p>4. 刷新页面，点击列表中任意一个请求</p>
-                <p>5. 在 <span className="font-medium">Request Headers</span> 中找到 <code className="text-indigo-600">Cookie:</code> 字段</p>
+                <p>2. 按 <kbd className="px-1 py-0.5 bg-white border border-gray-300 rounded text-xs">F12</kbd> 打开开发者工具
+                  <span className="text-gray-400">（Mac: <kbd className="px-1 bg-white border border-gray-300 rounded">Cmd+Option+I</kbd>）</span>
+                </p>
+                <p>3. 切换到 <span className="font-medium">Network</span>（网络）标签
+                  <span className="text-gray-400">（若中文界面为"网络"标签）</span>
+                </p>
+                <p>4. 刷新页面（<kbd className="px-1 py-0.5 bg-white border border-gray-300 rounded text-xs">F5</kbd> 或 <kbd className="px-1 py-0.5 bg-white border border-gray-300 rounded text-xs">Ctrl+R</kbd>），点击列表中任意一个请求</p>
+                <p>5. 在右侧 <span className="font-medium">Headers</span>（标头）→ <span className="font-medium">Request Headers</span>（请求标头）中找到 <code className="text-indigo-600">Cookie:</code> 字段</p>
                 <p>6. 复制 Cookie 后面的整段值，粘贴到上方输入框</p>
-                <p className="text-gray-400 mt-1">提示：Cookie 很长（通常数百字符），请确保完整复制</p>
+
+                <div className="mt-2 pt-2 border-t border-gray-200">
+                  <p className="font-medium text-gray-700">Cookie 格式示例：</p>
+                  <code className="block mt-1 p-2 bg-white border border-gray-200 rounded text-[10px] text-gray-500 overflow-x-auto">
+                    wt2=ABC123...; __cf_bm=DEF456...; token=XYZ789...
+                  </code>
+                  <p className="text-gray-400 mt-1">多个键值对用分号+空格分隔，通常数百字符</p>
+                </div>
+
+                <div className="mt-2 pt-2 border-t border-gray-200">
+                  <p className="font-medium text-gray-700">浏览器差异：</p>
+                  <ul className="list-disc ml-4 space-y-0.5 text-gray-500">
+                    <li><span className="font-medium">Chrome/Edge</span>：F12 → Network → 点击请求 → Headers → Request Headers</li>
+                    <li><span className="font-medium">Firefox</span>：F12 → 网络 → 点击请求 → 标头 → 请求标头</li>
+                    <li><span className="font-medium">Safari</span>：需先在"开发"菜单中启用Web检查器</li>
+                  </ul>
+                </div>
+
+                <div className="mt-2 pt-2 border-t border-gray-200">
+                  <p className="font-medium text-gray-700">常见错误排查：</p>
+                  <ul className="list-disc ml-4 space-y-0.5 text-gray-500">
+                    <li>粘贴后无响应 → 检查是否包含 <code className="text-indigo-600">wt2</code>（BOSS）或 <code className="text-indigo-600">guid</code>（51job）等关键键</li>
+                    <li>验证失败 → Cookie 已过期，重新登录后获取新的 Cookie</li>
+                    <li>搜索无结果 → Cookie 有效但权限不足，尝试在浏览器中先搜索一次再复制</li>
+                    <li>复制不完整 → 双击 Cookie 值全选后 Ctrl+C，避免手动拖选</li>
+                  </ul>
+                </div>
               </div>
             )}
           </div>

@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import {
   MessageSquare, Send, Loader2, AlertCircle, Play, RotateCcw,
   CheckCircle2, XCircle, AlertTriangle, Lightbulb, Target, Sparkles,
+  Star, ChevronDown,
 } from 'lucide-react';
 import client from '../api/client';
 
@@ -27,6 +28,18 @@ interface HistorySession {
   follow_up_count: number;
 }
 
+interface FavoriteJob {
+  id: number;
+  job_id: number;
+  job?: {
+    id: number;
+    title: string;
+    company: string;
+    jd_text: string;
+  };
+  created_at: string;
+}
+
 export default function InterviewPractice() {
   const [targetRole, setTargetRole] = useState('');
   const [jd, setJd] = useState('');
@@ -40,6 +53,9 @@ export default function InterviewPractice() {
   const [showHistory, setShowHistory] = useState(false);
   const [history, setHistory] = useState<HistorySession[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
+  const [showFavJobs, setShowFavJobs] = useState(false);
+  const [favJobs, setFavJobs] = useState<FavoriteJob[]>([]);
+  const [loadingFavJobs, setLoadingFavJobs] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -145,6 +161,26 @@ export default function InterviewPractice() {
     }
   };
 
+  const loadFavJobs = async () => {
+    try {
+      setLoadingFavJobs(true);
+      const { data } = await client.get('/jobs/favorites');
+      setFavJobs(Array.isArray(data?.results) ? data.results : []);
+    } catch {
+      // ignore
+    } finally {
+      setLoadingFavJobs(false);
+    }
+  };
+
+  const handleSelectFavJob = (fav: FavoriteJob) => {
+    if (fav.job) {
+      setTargetRole(fav.job.title || '');
+      setJd(fav.job.jd_text || '');
+    }
+    setShowFavJobs(false);
+  };
+
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
@@ -202,6 +238,51 @@ export default function InterviewPractice() {
       {!sessionId && !starting && (
         <div className="bg-white rounded-lg shadow p-6 mb-6">
           <div className="space-y-4">
+            {/* 从收藏岗位导入 */}
+            <div className="flex items-center gap-2 pb-3 border-b border-gray-100">
+              <button
+                onClick={() => {
+                  setShowFavJobs(!showFavJobs);
+                  if (!showFavJobs) loadFavJobs();
+                }}
+                className="inline-flex items-center gap-1.5 text-sm text-indigo-600 hover:text-indigo-700 font-medium"
+              >
+                <Star size={14} />
+                从收藏岗位导入
+                <ChevronDown size={12} className={showFavJobs ? 'rotate-180 transition-transform' : 'transition-transform'} />
+              </button>
+            </div>
+
+            {showFavJobs && (
+              <div className="bg-gray-50 rounded-lg p-3 max-h-60 overflow-y-auto">
+                {loadingFavJobs ? (
+                  <div className="flex items-center gap-2 text-gray-400 py-2">
+                    <Loader2 size={16} className="animate-spin" />
+                    <span className="text-sm">加载收藏岗位...</span>
+                  </div>
+                ) : favJobs.length === 0 ? (
+                  <p className="text-sm text-gray-400 py-2 text-center">暂无收藏岗位</p>
+                ) : (
+                  <div className="space-y-1.5">
+                    {favJobs.map(fav => (
+                      <button
+                        key={fav.id}
+                        onClick={() => handleSelectFavJob(fav)}
+                        className="w-full text-left p-2 rounded-md hover:bg-white transition-colors border border-transparent hover:border-indigo-200"
+                      >
+                        <p className="text-sm font-medium text-gray-800 truncate">
+                          {fav.job?.title || '未知岗位'}
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          {fav.job?.company || '未知公司'}
+                        </p>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1.5">
                 目标岗位 <span className="text-red-500">*</span>

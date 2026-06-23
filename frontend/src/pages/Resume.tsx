@@ -142,6 +142,23 @@ export default function ResumePage() {
   const dropRef = useRef<HTMLDivElement>(null);
   const [dragOver, setDragOver] = useState(false);
 
+  // 经历资产导入相关状态
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [experiences, setExperiences] = useState<Array<{
+    id: number;
+    type: string;
+    title: string;
+    background: string;
+    task: string;
+    action: string;
+    method_tool: string;
+    result: string;
+    evidence: string;
+  }>>([]);
+  const [selectedExpIds, setSelectedExpIds] = useState<Set<number>>(new Set());
+  const [importLoading, setImportLoading] = useState(false);
+  const [importError, setImportError] = useState('');
+
   const fetchResumes = useCallback(async () => {
     try {
       setLoadingResumes(true);
@@ -223,6 +240,87 @@ export default function ResumePage() {
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) handleFileChange(file);
+  };
+
+  // 打开经历资产导入弹窗
+  const handleOpenImportModal = async () => {
+    setShowImportModal(true);
+    setImportError('');
+    setSelectedExpIds(new Set());
+    try {
+      setImportLoading(true);
+      const { data } = await client.get('/experiences');
+      setExperiences(Array.isArray(data) ? data : []);
+    } catch {
+      setImportError('加载经历资产失败');
+    } finally {
+      setImportLoading(false);
+    }
+  };
+
+  // 切换经历选中状态
+  const toggleExpSelect = (id: number) => {
+    setSelectedExpIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  // 确认导入：将选中经历转为markdown，生成文件上传
+  const handleConfirmImport = async () => {
+    if (selectedExpIds.size === 0) {
+      setImportError('请至少选择一条经历');
+      return;
+    }
+
+    const typeLabels: Record<string, string> = {
+      project: '项目经历',
+      internship: '实习经历',
+      course: '课程项目',
+      club: '社团活动',
+      self_study: '自主学习',
+      part_time: '兼职经历',
+    };
+
+    const selectedExps = experiences.filter(e => selectedExpIds.has(e.id));
+    const mdContent = selectedExps.map(exp => {
+      const sections = [`## ${exp.title || '未命名经历'}`];
+      sections.push(`**类型**：${typeLabels[exp.type] || exp.type}`);
+      if (exp.background) sections.push(`**背景**：${exp.background}`);
+      if (exp.task) sections.push(`**任务**：${exp.task}`);
+      if (exp.action) sections.push(`**行动**：${exp.action}`);
+      if (exp.method_tool) sections.push(`**方法/工具**：${exp.method_tool}`);
+      if (exp.result) sections.push(`**结果**：${exp.result}`);
+      if (exp.evidence) sections.push(`**证据**：${exp.evidence}`);
+      return sections.join('\n\n');
+    }).join('\n\n---\n\n');
+
+    const header = `# 个人简历（从经历资产导入）\n\n> 生成时间：${new Date().toLocaleString('zh-CN')}\n\n---\n\n`;
+    const fullContent = header + mdContent;
+
+    try {
+      setImportLoading(true);
+      const blob = new Blob([fullContent], { type: 'text/markdown' });
+      const formData = new FormData();
+      formData.append('file', blob, `resume_from_experiences_${Date.now()}.md`);
+      const { data } = await client.post('/resumes/upload', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      setResumes(prev => [data, ...prev]);
+      setSelectedResumeId(data.id);
+      setShowImportModal(false);
+      setUploadError('');
+    } catch (err: unknown) {
+      const message =
+        err && typeof err === 'object' && 'response' in err
+          ? (err as { response?: { data?: { detail?: string } } }).response?.data?.detail || '导入失败，请重试'
+          : '导入失败，请重试';
+      setImportError(message);
+    } finally {
+      setImportLoading(false);
+    }
   };
 
   const handlePipelineOptimize = async () => {
@@ -393,7 +491,7 @@ export default function ResumePage() {
 
           {/* Bridge to Experiences */}
           <button
-            onClick={() => navigate('/experience-assets')}
+            onClick={handleOpenImportModal}
             className="flex items-center justify-center gap-2 w-full py-2 mt-2 bg-amber-50 text-amber-700 rounded-md text-sm font-medium hover:bg-amber-100 border border-amber-200 transition-colors"
           >
             <Award size={16} />
@@ -731,6 +829,128 @@ export default function ResumePage() {
               <p className="text-gray-500">选择简历和目标职位后，点击「启动6阶段Pipeline优化」</p>
             </div>
           )}
+        </div>
+      )}
+
+      {/* ========== 经历资产导入 Modal ========== */}
+      {showImportModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[80vh] flex flex-col">
+            <div className="flex items-center justify-between p-5 border-b border-gray-200">
+              <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                <Award size={20} className="text-amber-600" />
+                从经历资产导入
+              </h3>
+              <button
+                onClick={() => setShowImportModal(false)}
+                className="text-gray-400 hover:text-gray-600 text-xl leading-none"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-5">
+              {importLoading && experiences.length === 0 ? (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 size={24} className="animate-spin text-indigo-600" />
+                  <span className="ml-2 text-gray-500 text-sm">加载经历资产中...</span>
+                </div>
+              ) : experiences.length === 0 ? (
+                <div className="text-center py-12">
+                  <Award size={40} className="mx-auto text-gray-300 mb-3" />
+                  <p className="text-gray-500 text-sm">暂无经历资产</p>
+                  <button
+                    onClick={() => {
+                      setShowImportModal(false);
+                      navigate('/experience-assets');
+                    }}
+                    className="mt-3 text-sm text-indigo-600 hover:text-indigo-700 font-medium"
+                  >
+                    去添加经历资产 →
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <p className="text-sm text-gray-500 mb-3">
+                    勾选要导入的经历，将生成Markdown格式简历并保存为新版本
+                  </p>
+                  <div className="space-y-2">
+                    {experiences.map(exp => {
+                      const checked = selectedExpIds.has(exp.id);
+                      return (
+                        <label
+                          key={exp.id}
+                          className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
+                            checked ? 'border-amber-300 bg-amber-50' : 'border-gray-200 hover:bg-gray-50'
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={() => toggleExpSelect(exp.id)}
+                            className="mt-1 w-4 h-4 rounded border-gray-300 text-amber-600 focus:ring-amber-500"
+                          />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-gray-900 truncate">
+                              {exp.title || '未命名经历'}
+                            </p>
+                            <p className="text-xs text-gray-500 mt-0.5">
+                              {exp.background && <span>背景：{exp.background.slice(0, 60)}{exp.background.length > 60 ? '...' : ''}</span>}
+                            </p>
+                            {exp.result && (
+                              <p className="text-xs text-gray-400 mt-0.5">
+                                结果：{exp.result.slice(0, 60)}{exp.result.length > 60 ? '...' : ''}
+                              </p>
+                            )}
+                          </div>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </>
+              )}
+
+              {importError && (
+                <div className="mt-3 flex items-center gap-2 bg-red-50 text-red-700 px-3 py-2 rounded-md text-sm">
+                  <AlertCircle size={16} />
+                  <span>{importError}</span>
+                </div>
+              )}
+            </div>
+
+            {experiences.length > 0 && (
+              <div className="flex items-center justify-between p-4 border-t border-gray-200">
+                <span className="text-sm text-gray-500">
+                  已选 {selectedExpIds.size} 条
+                </span>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setShowImportModal(false)}
+                    className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-md transition-colors"
+                  >
+                    取消
+                  </button>
+                  <button
+                    onClick={handleConfirmImport}
+                    disabled={selectedExpIds.size === 0 || importLoading}
+                    className="px-4 py-2 text-sm bg-amber-600 text-white rounded-md hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5 transition-colors"
+                  >
+                    {importLoading ? (
+                      <>
+                        <Loader2 size={14} className="animate-spin" />
+                        导入中...
+                      </>
+                    ) : (
+                      <>
+                        <Award size={14} />
+                        确认导入
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>
