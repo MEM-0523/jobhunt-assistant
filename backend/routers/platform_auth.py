@@ -10,6 +10,10 @@ from auth import get_current_user
 class LiepinTokenRequest(BaseModel):
     token: str
 
+
+class CookieRequest(BaseModel):
+    cookie: str
+
 # 可选导入：liepin_mcp_client 和 playwright_crawler 会在后续 Task 中实现
 try:
     from liepin_mcp_client import LiepinMCPClient
@@ -134,6 +138,90 @@ async def validate_liepin_token(
         valid = client.validate_token()
     except Exception:
         valid = False
+
+    return {
+        "valid": valid,
+        "expires_at": auth.expires_at.isoformat() if auth.expires_at else None,
+    }
+
+
+@router.post("/{platform}/cookie")
+async def save_cookie(
+    platform: str,
+    req: CookieRequest,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """保存用户手动粘贴的 Cookie（BOSS直聘、前程无忧）"""
+    if platform not in COOKIE_PLATFORMS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"不支持的平台: {platform}，猎聘请使用 /liepin/token",
+        )
+
+    cookie = req.cookie.strip()
+    if not cookie:
+        raise HTTPException(status_code=400, detail="Cookie 不能为空")
+
+    expires_at = datetime.utcnow() + timedelta(days=COOKIE_EXPIRE_DAYS)
+    auth = db.query(PlatformAuth).filter(
+        PlatformAuth.user_id == user.id,
+        PlatformAuth.platform == platform,
+    ).first()
+
+    if auth:
+        auth.cookies = cookie
+        auth.status = "active"
+        auth.expires_at = expires_at
+    else:
+        auth = PlatformAuth(
+            user_id=user.id,
+            platform=platform,
+            cookies=cookie,
+            status="active",
+            expires_at=expires_at,
+        )
+        db.add(auth)
+
+    db.commit()
+    db.refresh(auth)
+
+    return {
+        "status": "active",
+        "expires_at": expires_at.isoformat(),
+    }
+
+
+@router.get("/{platform}/validate")
+async def validate_cookie(
+    platform: str,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """验证 Cookie 是否有效（通过发起一次轻量请求检测）"""
+    if platform not in COOKIE_PLATFORMS:
+        raise HTTPException(status_code=400, detail=f"不支持的平台: {platform}")
+
+    auth = db.query(PlatformAuth).filter(
+        PlatformAuth.user_id == user.id,
+        PlatformAuth.platform == platform,
+    ).first()
+
+    if not auth or not auth.cookies:
+        return {"valid": False, "expires_at": None}
+
+    # 检查过期
+    if auth.expires_at and auth.expires_at < datetime.utcnow():
+        auth.status = "expired"
+        db.commit()
+        return {"valid": False, "expires_at": auth.expires_at.isoformat()}
+
+    # 尝试轻量请求验证 Cookie
+    try:
+        from playwright_crawler import validate_cookie
+        valid = validate_cookie(platform, auth.cookies)
+    except Exception:
+        valid = True  # 无法验证时默认有效
 
     return {
         "valid": valid,

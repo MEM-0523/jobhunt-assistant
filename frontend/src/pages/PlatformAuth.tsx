@@ -10,6 +10,8 @@ import {
   KeyRound,
   Briefcase,
   Globe,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
 import client from '../api/client';
 
@@ -79,6 +81,10 @@ export default function PlatformAuth() {
   const [liepinValidating, setLiepinValidating] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [cookieInputs, setCookieInputs] = useState<Record<string, string>>({});
+  const [cookieSaving, setCookieSaving] = useState<string | null>(null);
+  const [cookieValidating, setCookieValidating] = useState<string | null>(null);
+  const [showGuide, setShowGuide] = useState<string | null>(null);
 
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -199,6 +205,45 @@ export default function PlatformAuth() {
     }
   };
 
+  const handleSaveCookie = async (platform: string) => {
+    const cookie = (cookieInputs[platform] || '').trim();
+    if (!cookie) {
+      setError(`请输入${getPlatformName(platform)}的 Cookie`);
+      return;
+    }
+    setCookieSaving(platform);
+    setError('');
+    setSuccess('');
+    try {
+      await client.post(`/platform-auth/${platform}/cookie`, { cookie });
+      setSuccess(`${getPlatformName(platform)} Cookie 保存成功`);
+      setCookieInputs({ ...cookieInputs, [platform]: '' });
+      await loadStatus();
+    } catch (e) {
+      setError(`保存失败: ${getErrorMessage(e, '未知错误')}`);
+    } finally {
+      setCookieSaving(null);
+    }
+  };
+
+  const handleValidateCookie = async (platform: string) => {
+    setCookieValidating(platform);
+    setError('');
+    setSuccess('');
+    try {
+      const { data } = await client.get<{ valid: boolean }>(`/platform-auth/${platform}/validate`);
+      if (data.valid) {
+        setSuccess(`${getPlatformName(platform)} Cookie 有效`);
+      } else {
+        setError(`${getPlatformName(platform)} Cookie 已失效，请重新获取`);
+      }
+    } catch (e) {
+      setError(`验证失败: ${getErrorMessage(e, '未知错误')}`);
+    } finally {
+      setCookieValidating(null);
+    }
+  };
+
   const renderStatusBadge = (status: string) => (
     <span
       className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium ${STATUS_STYLES[status] || STATUS_STYLES.disconnected}`}
@@ -214,8 +259,11 @@ export default function PlatformAuth() {
     const s = getStatus(platform);
     const status = s?.status || 'disconnected';
     const Icon = PLATFORM_ICONS[platform] || Briefcase;
-    const isLoggingIn = loginLoading === platform;
+    const isSaving = cookieSaving === platform;
+    const isValidating = cookieValidating === platform;
     const expiry = formatExpiry(s?.expires_at || null);
+    const guideOpen = showGuide === platform;
+    const loginUrl = platform === 'boss' ? 'https://www.zhipin.com/' : 'https://login.51job.com/';
 
     return (
       <div key={platform} className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 flex flex-col">
@@ -226,7 +274,7 @@ export default function PlatformAuth() {
             </div>
             <div>
               <h3 className="font-semibold text-gray-900">{getPlatformName(platform)}</h3>
-              <p className="text-xs text-gray-400">{platform === 'boss' ? '浏览器登录（点击首页登录按钮）' : '浏览器登录'}</p>
+              <p className="text-xs text-gray-400">Cookie 授权</p>
             </div>
           </div>
           {renderStatusBadge(status)}
@@ -239,34 +287,96 @@ export default function PlatformAuth() {
           </div>
         )}
 
-        <div className="flex gap-2 mt-auto pt-2">
+        {status !== 'active' && (
+          <div className="mb-3">
+            <label className="block text-xs text-gray-500 mb-1.5">Cookie 字符串</label>
+            <textarea
+              value={cookieInputs[platform] || ''}
+              onChange={(e) => setCookieInputs({ ...cookieInputs, [platform]: e.target.value })}
+              placeholder={`粘贴从${getPlatformName(platform)}复制的 Cookie 字符串`}
+              rows={3}
+              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent font-mono text-xs"
+            />
+            <div className="flex items-center justify-between mt-2">
+              <button
+                onClick={() => setShowGuide(guideOpen ? null : platform)}
+                className="inline-flex items-center gap-1 text-xs text-indigo-600 hover:text-indigo-700"
+              >
+                {guideOpen ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+                获取 Cookie 指引
+              </button>
+              <a
+                href={loginUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700"
+              >
+                <ExternalLink size={12} />
+                打开{getPlatformName(platform)}
+              </a>
+            </div>
+            {guideOpen && (
+              <div className="mt-2 p-3 bg-gray-50 rounded-md text-xs text-gray-600 space-y-1.5">
+                <p className="font-medium text-gray-700">操作步骤：</p>
+                <p>1. 点击上方链接打开{getPlatformName(platform)}并登录</p>
+                <p>2. 按 <kbd className="px-1 py-0.5 bg-white border border-gray-300 rounded text-xs">F12</kbd> 打开开发者工具</p>
+                <p>3. 切换到 <span className="font-medium">Network</span>（网络）标签</p>
+                <p>4. 刷新页面，点击列表中任意一个请求</p>
+                <p>5. 在 <span className="font-medium">Request Headers</span> 中找到 <code className="text-indigo-600">Cookie:</code> 字段</p>
+                <p>6. 复制 Cookie 后面的整段值，粘贴到上方输入框</p>
+                <p className="text-gray-400 mt-1">提示：Cookie 很长（通常数百字符），请确保完整复制</p>
+              </div>
+            )}
+          </div>
+        )}
+
+        <div className="flex gap-2 mt-auto pt-2 flex-wrap">
           {status !== 'active' && (
             <button
-              onClick={() => handleLogin(platform)}
-              disabled={isLoggingIn}
+              onClick={() => handleSaveCookie(platform)}
+              disabled={isSaving}
               className="inline-flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-md disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
-              {isLoggingIn ? (
+              {isSaving ? (
                 <>
                   <Loader2 size={14} className="animate-spin" />
-                  登录中...
+                  保存中...
                 </>
               ) : (
                 <>
-                  <Link2 size={14} />
-                  登录
+                  <KeyRound size={14} />
+                  保存 Cookie
                 </>
               )}
             </button>
           )}
           {status === 'active' && (
-            <button
-              onClick={() => handleDisconnect(platform)}
-              className="inline-flex items-center gap-1.5 px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm rounded-md transition-colors"
-            >
-              <Unlink size={14} />
-              断开
-            </button>
+            <>
+              <button
+                onClick={() => handleValidateCookie(platform)}
+                disabled={isValidating}
+                className="inline-flex items-center gap-1.5 px-4 py-2 border border-gray-300 hover:bg-gray-50 text-gray-700 text-sm rounded-md disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                {isValidating ? (
+                  <>
+                    <Loader2 size={14} className="animate-spin" />
+                    验证中...
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle size={14} />
+                    验证
+                  </>
+                )}
+              </button>
+              <button
+                onClick={() => handleDisconnect(platform)}
+                className="inline-flex items-center gap-1.5 px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm rounded-md transition-colors"
+              >
+                <Unlink size={14} />
+                断开
+              </button>
+            </>
           )}
         </div>
       </div>
@@ -416,7 +526,7 @@ export default function PlatformAuth() {
           平台连接
         </h1>
         <p className="text-gray-500 mt-2 text-sm">
-          管理招聘平台的登录状态。BOSS直聘、前程无忧通过浏览器登录获取 Cookie（BOSS直聘需在弹出浏览器中点击「登录」按钮）；猎聘通过 Token 授权；Himalayas、Remotive 为公开 API，无需登录。
+          管理招聘平台的登录状态。BOSS直聘、前程无忧通过 Cookie 授权（从浏览器开发者工具复制）；猎聘通过 Token 授权；Himalayas、Remotive 为公开 API，无需登录。
         </p>
       </div>
 

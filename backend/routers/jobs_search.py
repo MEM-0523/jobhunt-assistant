@@ -164,7 +164,7 @@ def try_liepin_search(keyword: str, city: str) -> Optional[list[dict]]:
 
 
 def try_boss_playwright_search(keyword: str, city: str, db: Session, user_id: int) -> Optional[list[dict]]:
-    """使用 Playwright + 已保存的 Cookie 搜索 BOSS直聘"""
+    """使用 Cookie 搜索 BOSS直聘（优先 httpx，回退 Playwright）"""
     try:
         from models import PlatformAuth
         auth = db.query(PlatformAuth).filter(
@@ -181,16 +181,27 @@ def try_boss_playwright_search(keyword: str, city: str, db: Session, user_id: in
             db.commit()
             return None
 
-        cookies = json.loads(auth.cookies)
+        cookies = auth.cookies
 
-        from playwright_crawler import search_with_cookies
-        jobs = search_with_cookies("boss", keyword, city, cookies)
+        # 判断 Cookie 格式：JSON 列表（旧 Playwright）还是原始字符串（新粘贴）
+        is_raw_string = not cookies.strip().startswith("[")
+
+        if is_raw_string:
+            # 新格式：原始 Cookie 字符串，用 httpx 搜索（云端可用）
+            from playwright_crawler import search_with_cookie_string
+            jobs = search_with_cookie_string("boss", keyword, city, cookies)
+        else:
+            # 旧格式：JSON Cookie 列表，用 Playwright 搜索（仅本地）
+            cookie_list = json.loads(cookies)
+            from playwright_crawler import search_with_cookies
+            jobs = search_with_cookies("boss", keyword, city, cookie_list)
+
         if jobs:
             for j in jobs:
                 j["data_source"] = "boss"
             return jobs
     except Exception as e:
-        print(f"[boss playwright search error] {e}")
+        print(f"[boss search error] {e}")
     return None
 
 
@@ -225,7 +236,7 @@ def try_liepin_mcp_search(keyword: str, city: str, db: Session, user_id: int) ->
 
 
 def try_51job_playwright_search(keyword: str, city: str, db: Session, user_id: int) -> Optional[list[dict]]:
-    """使用 Playwright + 已保存的 Cookie 搜索前程无忧"""
+    """使用 Cookie 搜索前程无忧（优先 httpx，回退 Playwright）"""
     try:
         from models import PlatformAuth
         auth = db.query(PlatformAuth).filter(
@@ -241,16 +252,25 @@ def try_51job_playwright_search(keyword: str, city: str, db: Session, user_id: i
             db.commit()
             return None
 
-        cookies = json.loads(auth.cookies)
+        cookies = auth.cookies
 
-        from playwright_crawler import search_with_cookies
-        jobs = search_with_cookies("51job", keyword, city, cookies)
+        # 判断 Cookie 格式
+        is_raw_string = not cookies.strip().startswith("[")
+
+        if is_raw_string:
+            from playwright_crawler import search_with_cookie_string
+            jobs = search_with_cookie_string("51job", keyword, city, cookies)
+        else:
+            cookie_list = json.loads(cookies)
+            from playwright_crawler import search_with_cookies
+            jobs = search_with_cookies("51job", keyword, city, cookie_list)
+
         if jobs:
             for j in jobs:
                 j["data_source"] = "51job"
             return jobs
     except Exception as e:
-        print(f"[51job playwright search error] {e}")
+        print(f"[51job search error] {e}")
     return None
 
 

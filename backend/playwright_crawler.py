@@ -952,6 +952,221 @@ def fetch_jd_detail(jd_url: str) -> str:
             _close_browser(p, browser, context)
 
 
+def validate_cookie(platform: str, cookie_str: str) -> bool:
+    """验证 Cookie 字符串是否有效（轻量请求检测）。
+
+    Args:
+        platform: 平台标识 'boss' / '51job'
+        cookie_str: 原始 Cookie 字符串（如 "wt2=xxx; wbg=yyy; ..."）
+
+    Returns:
+        True 表示 Cookie 有效，False 表示无效。
+    """
+    import httpx
+
+    headers = {
+        "User-Agent": STEALTH_USER_AGENT,
+        "Accept": "text/html,application/xhtml+xml",
+        "Accept-Language": "zh-CN,zh;q=0.9,en-US;q=0.8,en;q=0.7",
+        "Cookie": cookie_str,
+    }
+
+    check_urls = {
+        "boss": "https://www.zhipin.com/",
+        "51job": "https://we.51job.com/",
+    }
+    url = check_urls.get(platform)
+    if not url:
+        return False
+
+    try:
+        with httpx.Client(timeout=10, follow_redirects=False, headers=headers) as c:
+            resp = c.get(url)
+            # 如果被重定向到登录页，说明 Cookie 失效
+            if resp.status_code in (301, 302, 303, 307, 308):
+                location = resp.headers.get("location", "")
+                if "login" in location.lower() or "passport" in location.lower():
+                    return False
+            return resp.status_code == 200
+    except Exception as e:
+        print(f"[validate_cookie] {platform} 验证失败: {e}")
+        return False
+
+
+def search_with_cookie_string(
+    platform: str,
+    keyword: str,
+    city: str,
+    cookie_str: str,
+) -> list[dict]:
+    """使用原始 Cookie 字符串搜索岗位（httpx，无需 Playwright）。
+
+    适用于云端 Docker 环境（无浏览器、无显示器）。
+    通过 httpx 直接请求搜索页 HTML，用 BeautifulSoup 解析岗位列表。
+
+    Args:
+        platform: 平台标识 'boss' / '51job'
+        keyword: 搜索关键词
+        city: 城市名（中文）
+        cookie_str: 原始 Cookie 字符串
+
+    Returns:
+        标准化岗位列表，失败返回空列表。
+    """
+    import httpx
+    from bs4 import BeautifulSoup
+
+    if platform not in SEARCH_URL_TEMPLATES:
+        print(f"[search_with_cookie_string] 不支持的平台: {platform}")
+        return []
+
+    city_code = CITY_CODES.get(platform, {}).get(city, city)
+    url = SEARCH_URL_TEMPLATES[platform].format(
+        keyword=urllib.parse.quote(keyword),
+        city_code=city_code,
+    )
+
+    headers = {
+        "User-Agent": STEALTH_USER_AGENT,
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "zh-CN,zh;q=0.9,en-US;q=0.8,en;q=0.7",
+        "Referer": LOGIN_URLS.get(platform, ""),
+        "Cookie": cookie_str,
+    }
+
+    try:
+        with httpx.Client(timeout=SEARCH_TIMEOUT_MS / 1000, follow_redirects=True, headers=headers) as c:
+            resp = c.get(url)
+            if resp.status_code != 200:
+                print(f"[search_with_cookie_string] {platform} HTTP {resp.status_code}")
+                return []
+
+            html = resp.text
+            # 检查是否被重定向到登录页
+            if "login" in str(resp.url).lower() or "passport" in str(resp.url).lower():
+                print(f"[search_with_cookie_string] {platform} Cookie 已失效，跳转登录页")
+                return []
+
+            soup = BeautifulSoup(html, "html.parser")
+
+            if platform == "boss":
+                return _extract_boss_jobs_bs4(soup, city)
+            elif platform == "51job":
+                return _extract_51job_jobs_bs4(soup, city)
+            return []
+    except Exception as e:
+        print(f"[search_with_cookie_string] {platform} 搜索失败: {e}")
+        return []
+
+
+def _extract_boss_jobs_bs4(soup, city: str) -> list[dict]:
+    """从 BeautifulSoup 解析的 BOSS直聘搜索页提取岗位。"""
+    results: list[dict] = []
+    items = soup.select(".job-card-wrapper, .job-card-left, [class*=job-card]")
+    for it in items:
+        try:
+            title_el = it.select_one(".job-name, .job-title, [class*=job-name] a, a")
+            title = title_el.get_text(strip=True) if title_el else ""
+            if not title:
+                continue
+
+            company_el = it.select_one(".company-name, [class*=company-name] a, .company-info a")
+            company = company_el.get_text(strip=True) if company_el else ""
+
+            salary_el = it.select_one(".salary, .red, [class*=salary]")
+            salary = salary_el.get_text(strip=True) if salary_el else ""
+
+            link_el = it.select_one("a[href*='/job_detail/'], a[href*='/job/']")
+            jd_url = ""
+            if link_el:
+                href = link_el.get("href", "")
+                if href.startswith("//"):
+                    jd_url = "https:" + href
+                elif href.startswith("/"):
+                    jd_url = "https://www.zhipin.com" + href
+                elif href.startswith("http"):
+                    jd_url = href
+
+            tags_el = it.select(".tag-list span, .job-info span, [class*=tag] span")
+            tags = [t.get_text(strip=True) for t in tags_el if t.get_text(strip=True)]
+            experience = ""
+            degree = ""
+            for t in tags:
+                if "年" in t and not experience:
+                    experience = t
+                elif t in ("大专", "本科", "硕士", "博士") and not degree:
+                    degree = t
+
+            results.append({
+                "title": title,
+                "company": company,
+                "salary": salary,
+                "city": city,
+                "platform": "BOSS直聘",
+                "jd_text": "",
+                "jd_url": jd_url,
+                "experience": experience,
+                "degree": degree,
+            })
+        except Exception:
+            continue
+    return results
+
+
+def _extract_51job_jobs_bs4(soup, city: str) -> list[dict]:
+    """从 BeautifulSoup 解析的前程无忧搜索页提取岗位。"""
+    results: list[dict] = []
+    items = soup.select(".joblist-box .el, .el, [class*=job]")
+    for it in items:
+        try:
+            title_el = it.select_one(".jname, .jobname, [class*=title] a, a.t")
+            title = title_el.get_text(strip=True) if title_el else ""
+            if not title:
+                continue
+
+            company_el = it.select_one(".cname, .company_name, [class*=company]")
+            company = company_el.get_text(strip=True) if company_el else ""
+
+            salary_el = it.select_one(".sal, .salary, [class*=salary]")
+            salary = salary_el.get_text(strip=True) if salary_el else ""
+
+            link_el = it.select_one("a[href*='/job/']")
+            jd_url = ""
+            if link_el:
+                href = link_el.get("href", "")
+                if href.startswith("//"):
+                    jd_url = "https:" + href
+                elif href.startswith("/"):
+                    jd_url = "https://we.51job.com" + href
+                elif href.startswith("http"):
+                    jd_url = href
+
+            info_el = it.select_one(".info, .d.at, [class*=info]")
+            info_text = info_el.get_text(strip=True) if info_el else ""
+            experience = ""
+            degree = ""
+            for part in info_text.replace("|", " ").split():
+                if "年" in part and not experience:
+                    experience = part
+                elif part in ("大专", "本科", "硕士", "博士") and not degree:
+                    degree = part
+
+            results.append({
+                "title": title,
+                "company": company,
+                "salary": salary,
+                "city": city,
+                "platform": "前程无忧",
+                "jd_text": "",
+                "jd_url": jd_url,
+                "experience": experience,
+                "degree": degree,
+            })
+        except Exception:
+            continue
+    return results
+
+
 if __name__ == "__main__":
     # 测试三个平台的搜索功能
     test_keyword = "产品经理"
