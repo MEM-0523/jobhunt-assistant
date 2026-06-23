@@ -12,6 +12,13 @@ class User(Base):
     password_hash = Column(String, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
 
+    # 邮箱验证 & 密码重置
+    is_verified = Column(Boolean, default=False)
+    verification_code = Column(String, nullable=True)
+    verification_expires = Column(DateTime, nullable=True)
+    reset_token = Column(String, nullable=True)
+    reset_expires = Column(DateTime, nullable=True)
+
     profile = relationship("Profile", back_populates="user", uselist=False)
     jobs = relationship("Job", back_populates="user")
     applications = relationship("Application", back_populates="user")

@@ -117,6 +117,9 @@ export default function Login() {
               />
               <span className="text-sm text-gray-600">记住我</span>
             </label>
+            <Link to="/forgot-password" className="text-sm text-indigo-600 hover:text-indigo-700 font-medium">
+              忘记密码？
+            </Link>
           </div>
 
           <button
