@@ -4,7 +4,7 @@ import {
   Target, MessageSquare, BookOpen, HelpCircle, ClipboardCheck, ChevronDown,
   ChevronUp, Loader2, AlertCircle, Check, ClipboardList, Star, Save, Calendar,
   DollarSign, AlertTriangle, Shield, Building2, TrendingUp, Zap, Clock, User,
-  Briefcase, Link2, CheckSquare, Mic,
+  Briefcase, Link2, CheckSquare, Mic, Award,
 } from 'lucide-react';
 import client from '../api/client';
 import type { Application, InterviewPrepData, QAPair, Story, QuestionToAsk, InterviewReview } from '../types';
@@ -53,6 +53,23 @@ export default function InterviewPrep() {
 
   // Expanded story cards
   const [expandedStories, setExpandedStories] = useState<Set<number>>(new Set());
+
+  // 经历资产导入相关状态
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [experiences, setExperiences] = useState<Array<{
+    id: number;
+    type: string;
+    title: string;
+    background: string;
+    task: string;
+    action: string;
+    method_tool: string;
+    result: string;
+    evidence: string;
+  }>>([]);
+  const [selectedExpIds, setSelectedExpIds] = useState<Set<number>>(new Set());
+  const [importLoading, setImportLoading] = useState(false);
+  const [importError, setImportError] = useState('');
 
   // Checked questions
   const [checkedQuestions, setCheckedQuestions] = useState<Set<number>>(new Set());
@@ -133,6 +150,65 @@ export default function InterviewPrep() {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
       else next.add(id);
+      return next;
+    });
+  };
+
+  // 打开经历资产导入弹窗
+  const handleOpenImportModal = async () => {
+    setShowImportModal(true);
+    setImportError('');
+    setSelectedExpIds(new Set());
+    try {
+      setImportLoading(true);
+      const { data } = await client.get('/experiences');
+      setExperiences(Array.isArray(data) ? data : []);
+    } catch {
+      setImportError('加载经历资产失败');
+    } finally {
+      setImportLoading(false);
+    }
+  };
+
+  // 切换经历选中状态
+  const toggleExpSelect = (id: number) => {
+    setSelectedExpIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  // 确认导入：将选中经历映射为Story结构，添加到stories列表
+  const handleConfirmImport = () => {
+    if (selectedExpIds.size === 0) {
+      setImportError('请至少选择一条经历');
+      return;
+    }
+
+    const selectedExps = experiences.filter(e => selectedExpIds.has(e.id));
+    const newStories: Story[] = selectedExps.map((exp, index) => ({
+      id: -(Date.now() + index), // 负数ID区分导入的故事
+      title: `[经历资产] ${exp.title || '未命名经历'}`,
+      situation: exp.background || '',
+      task: exp.task || '',
+      action: exp.action || '',
+      result: exp.result || '',
+      reflection: exp.evidence || '',
+      methodology: exp.method_tool || '',
+    }));
+
+    if (prepData) {
+      setPrepData({
+        ...prepData,
+        stories: [...prepData.stories, ...newStories],
+      });
+    }
+    setShowImportModal(false);
+    setExpandedStories(prev => {
+      const next = new Set(prev);
+      newStories.forEach(s => next.add(s.id));
       return next;
     });
   };
@@ -480,8 +556,17 @@ export default function InterviewPrep() {
             {/* Tab 3: 故事库 */}
             {activeTab === 'stories' && (
               <div>
-                <h2 className="text-lg font-semibold text-gray-900 mb-1">故事化表达故事库</h2>
-                <p className="text-sm text-gray-500 mb-4">每个故事对应岗位要求，点击展开查看完整内容</p>
+                <div className="flex items-center justify-between mb-1">
+                  <h2 className="text-lg font-semibold text-gray-900">故事化表达故事库</h2>
+                  <button
+                    onClick={handleOpenImportModal}
+                    className="inline-flex items-center gap-1.5 text-sm text-amber-600 hover:text-amber-700 font-medium"
+                  >
+                    <Award size={14} />
+                    从经历资产导入
+                  </button>
+                </div>
+                <p className="text-sm text-gray-500 mb-4">每个故事对应岗位要求，点击展开查看完整内容。导入的经历以 [经历资产] 标记</p>
                 <div className="space-y-4">
                   {prepData.stories.map((story: Story) => (
                     <div key={story.id} className="border border-gray-200 rounded-lg overflow-hidden">
@@ -492,6 +577,12 @@ export default function InterviewPrep() {
                         <div className="flex items-center gap-2 min-w-0">
                           <BookOpen size={16} className="text-blue-500 flex-shrink-0" />
                           <span className="text-sm font-medium text-gray-800">{story.title}</span>
+                          {story.title.startsWith('[经历资产]') && (
+                            <span className="inline-flex items-center gap-0.5 text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full flex-shrink-0">
+                              <Award size={10} />
+                              真实经历
+                            </span>
+                          )}
                         </div>
                         {expandedStories.has(story.id) ? (
                           <ChevronUp size={18} className="text-gray-400 flex-shrink-0 ml-2" />
@@ -958,6 +1049,121 @@ export default function InterviewPrep() {
                     ))}
                   </div>
                 )}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ========== 经历资产导入 Modal ========== */}
+      {showImportModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[80vh] flex flex-col">
+            <div className="flex items-center justify-between p-5 border-b border-gray-200">
+              <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                <Award size={20} className="text-amber-600" />
+                从经历资产导入到故事库
+              </h3>
+              <button
+                onClick={() => setShowImportModal(false)}
+                className="text-gray-400 hover:text-gray-600 text-xl leading-none"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-5">
+              {importLoading && experiences.length === 0 ? (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 size={24} className="animate-spin text-indigo-600" />
+                  <span className="ml-2 text-gray-500 text-sm">加载经历资产中...</span>
+                </div>
+              ) : experiences.length === 0 ? (
+                <div className="text-center py-12">
+                  <Award size={40} className="mx-auto text-gray-300 mb-3" />
+                  <p className="text-gray-500 text-sm">暂无经历资产</p>
+                  <button
+                    onClick={() => {
+                      setShowImportModal(false);
+                      navigate('/experience-assets');
+                    }}
+                    className="mt-3 text-sm text-indigo-600 hover:text-indigo-700 font-medium"
+                  >
+                    去添加经历资产 →
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <p className="text-sm text-gray-500 mb-3">
+                    勾选要导入的经历，将自动映射为STAR故事结构（背景→Situation，任务→Task，行动→Action，结果→Result，证据→Reflection）
+                  </p>
+                  <div className="space-y-2">
+                    {experiences.map(exp => {
+                      const checked = selectedExpIds.has(exp.id);
+                      return (
+                        <label
+                          key={exp.id}
+                          className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
+                            checked ? 'border-amber-300 bg-amber-50' : 'border-gray-200 hover:bg-gray-50'
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={() => toggleExpSelect(exp.id)}
+                            className="mt-1 w-4 h-4 rounded border-gray-300 text-amber-600 focus:ring-amber-500"
+                          />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-gray-900 truncate">
+                              {exp.title || '未命名经历'}
+                            </p>
+                            {exp.background && (
+                              <p className="text-xs text-gray-500 mt-0.5">
+                                背景：{exp.background.slice(0, 60)}{exp.background.length > 60 ? '...' : ''}
+                              </p>
+                            )}
+                            {exp.result && (
+                              <p className="text-xs text-gray-400 mt-0.5">
+                                结果：{exp.result.slice(0, 60)}{exp.result.length > 60 ? '...' : ''}
+                              </p>
+                            )}
+                          </div>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </>
+              )}
+
+              {importError && (
+                <div className="mt-3 flex items-center gap-2 bg-red-50 text-red-700 px-3 py-2 rounded-md text-sm">
+                  <AlertCircle size={16} />
+                  <span>{importError}</span>
+                </div>
+              )}
+            </div>
+
+            {experiences.length > 0 && (
+              <div className="flex items-center justify-between p-4 border-t border-gray-200">
+                <span className="text-sm text-gray-500">
+                  已选 {selectedExpIds.size} 条
+                </span>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setShowImportModal(false)}
+                    className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-md transition-colors"
+                  >
+                    取消
+                  </button>
+                  <button
+                    onClick={handleConfirmImport}
+                    disabled={selectedExpIds.size === 0}
+                    className="px-4 py-2 text-sm bg-amber-600 text-white rounded-md hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5 transition-colors"
+                  >
+                    <Award size={14} />
+                    确认导入
+                  </button>
+                </div>
               </div>
             )}
           </div>
