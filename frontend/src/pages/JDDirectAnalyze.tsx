@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Zap, Loader2, AlertCircle, Heart, Send, FileText, CheckCircle, ChevronDown, ChevronUp, Lightbulb } from 'lucide-react';
+import { Zap, Loader2, AlertCircle, Heart, Send, FileText, CheckCircle, ChevronDown, ChevronUp, Lightbulb, Image as ImageIcon } from 'lucide-react';
 import client from '../api/client';
 import { transitionCases } from '../data/transitionCases';
 import FiveDimensionScore from '../components/FiveDimensionScore';
@@ -115,6 +115,57 @@ export default function JDDirectAnalyze() {
   const [analysis, setAnalysis] = useState<BlockAnalysis | null>(null);
   const [actionLoading, setActionLoading] = useState('');
   const [caseExpanded, setCaseExpanded] = useState(false);
+  const [ocrLoading, setOcrLoading] = useState(false);
+  const [ocrError, setOcrError] = useState('');
+  const [dragOver, setDragOver] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleOcrImage = async (file: File) => {
+    if (!file.type.startsWith('image/')) {
+      setOcrError('请上传图片文件');
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      setOcrError('图片大小不能超过10MB');
+      return;
+    }
+
+    setOcrError('');
+    setOcrLoading(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      const { data } = await client.post('/jd/ocr', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      if (data.text) {
+        setJdText(prev => prev ? `${prev}\n\n${data.text}` : data.text);
+      } else {
+        setOcrError('未识别到文字，请尝试更清晰的图片');
+      }
+    } catch (err: unknown) {
+      const message =
+        err && typeof err === 'object' && 'response' in err
+          ? (err as { response?: { data?: { detail?: string } } }).response?.data?.detail || 'OCR识别失败，请检查百度云配置'
+          : 'OCR识别失败，请重试';
+      setOcrError(message);
+    } finally {
+      setOcrLoading(false);
+    }
+  };
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) handleOcrImage(file);
+    e.target.value = '';
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setDragOver(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file) handleOcrImage(file);
+  };
 
   const handleAnalyze = async () => {
     if (!jdText.trim()) {
@@ -276,6 +327,46 @@ export default function JDDirectAnalyze() {
               填入示例JD
             </button>
           </div>
+
+          {/* 图片OCR上传区 */}
+          <div className="mb-3">
+            <div
+              onClick={() => fileInputRef.current?.click()}
+              onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+              onDragLeave={() => setDragOver(false)}
+              onDrop={handleDrop}
+              className={`border-2 border-dashed rounded-lg p-3 text-center cursor-pointer transition-colors ${
+                dragOver ? 'border-indigo-400 bg-indigo-50' : 'border-gray-300 hover:border-indigo-300 hover:bg-gray-50'
+              }`}
+            >
+              {ocrLoading ? (
+                <div className="flex items-center justify-center gap-2 text-sm text-indigo-600">
+                  <Loader2 size={16} className="animate-spin" />
+                  OCR识别中...
+                </div>
+              ) : (
+                <div className="flex items-center justify-center gap-2 text-sm text-gray-500">
+                  <ImageIcon size={16} />
+                  <span>上传JD截图，自动OCR识别文字</span>
+                  <span className="text-xs text-gray-400">（支持拖拽，JPG/PNG，≤10MB）</span>
+                </div>
+              )}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp,image/gif"
+                onChange={handleFileSelect}
+                className="hidden"
+              />
+            </div>
+            {ocrError && (
+              <div className="mt-1.5 flex items-center gap-1.5 text-xs text-red-600">
+                <AlertCircle size={12} />
+                {ocrError}
+              </div>
+            )}
+          </div>
+
           <textarea
             value={jdText}
             onChange={(e) => setJdText(e.target.value)}
