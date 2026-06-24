@@ -33,10 +33,12 @@ WORKDIR /app/backend
 # Hugging Face Spaces 要求端口 7860
 EXPOSE 7860
 
-# 创建数据目录（持久化 SQLite 数据库）
-RUN mkdir -p /app/backend/data
+# HF Spaces 持久化目录（容器重启不丢失）
+RUN mkdir -p /data
 
 ENV PYTHONUNBUFFERED=1
 ENV PRODUCTION=true
+# SQLite 数据库放在持久化目录，容器重启数据不丢失
+ENV DATABASE_URL=sqlite:////data/job_assistant.db
 
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "7860"]

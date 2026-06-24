@@ -9,7 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from database import engine, Base
-from routers import auth, profile, jobs, jobs_search, jobs_analysis, resumes, applications, interviews, feedback, career, seed, notifications, experiences, strengths, platform_auth, jd_ocr
+from routers import auth, profile, jobs, jobs_search, jobs_analysis, resumes, applications, interviews, feedback, career, seed, notifications, experiences, strengths, platform_auth
 
 DEFAULT_CORS_ORIGINS = [
     "http://localhost:5173",
@@ -25,6 +25,8 @@ DEFAULT_CORS_ORIGINS = [
     "https://dada-jobhunt.pages.dev",
     "https://*.pages.dev",
     "https://*.loca.lt",
+    "https://mem-x-jobhunt-assistant.hf.space",
+    "https://*.hf.space",
 ]
 
 cors_env = os.getenv("CORS_ALLOW_ORIGINS", "")
@@ -72,7 +74,6 @@ app.include_router(notifications.router, prefix="/api")
 app.include_router(experiences.router, prefix="/api")
 app.include_router(strengths.router, prefix="/api")
 app.include_router(platform_auth.router, prefix="/api/platform-auth", tags=["platform-auth"])
-app.include_router(jd_ocr.router, prefix="/api")
 
 
 @app.get("/api/health")
